@@ -1,0 +1,19 @@
+# One-click deploy on Render (https://render.com): New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: high-roller-holdem
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Optional TURN relay for friends on strict networks (see README):
+      # - key: TURN_URL
+      #   sync: false
+      # - key: TURN_USERNAME
+      #   sync: false
+      # - key: TURN_CREDENTIAL
+      #   sync: false

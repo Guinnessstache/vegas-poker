@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>High Roller Hold'em</title>
+  <meta name="description" content="3D multiplayer No-Limit Texas Hold'em in a Vegas casino. Invite friends with a table code." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three/build/three.module.js",
+        "three/addons/": "/vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <!-- Loading -->
+  <div id="loading"><div class="spinner">♠</div><div>Opening the casino…</div></div>
+
+  <!-- Lobby -->
+  <section id="lobby" class="hidden">
+    <div class="lobby-inner">
+      <h1 class="logo"><span class="suit">♠</span> High Roller <span class="suit red">♥</span><small>No-Limit Texas Hold'em</small></h1>
+      <label class="field name-field">
+        <span>Your name at the table</span>
+        <input id="name-input" maxlength="16" autocomplete="nickname" placeholder="e.g. Ace McGee" />
+      </label>
+      <div class="lobby-cards">
+        <div class="panel">
+          <h2>Host a table</h2>
+          <div class="grid2">
+            <label class="field"><span>Starting chips</span>
+              <select id="set-stack">
+                <option value="5000">5,000</option>
+                <option value="10000" selected>10,000</option>
+                <option value="25000">25,000</option>
+                <option value="100000">100,000</option>
+              </select>
+            </label>
+            <label class="field"><span>Blinds</span>
+              <select id="set-blinds">
+                <option value="50">25 / 50</option>
+                <option value="100" selected>50 / 100</option>
+                <option value="200">100 / 200</option>
+                <option value="500">250 / 500</option>
+                <option value="1000">500 / 1,000</option>
+              </select>
+            </label>
+            <label class="field"><span>Turn timer</span>
+              <select id="set-timer">
+                <option value="20">20 sec</option>
+                <option value="30" selected>30 sec</option>
+                <option value="45">45 sec</option>
+                <option value="60">60 sec</option>
+                <option value="120">2 min</option>
+              </select>
+            </label>
+            <label class="field"><span>Rebuys</span>
+              <select id="set-rebuy">
+                <option value="1" selected>Allowed</option>
+                <option value="0">Freezeout</option>
+              </select>
+            </label>
+          </div>
+          <button id="create-btn" class="btn gold big">Create table</button>
+        </div>
+        <div class="panel">
+          <h2>Join friends</h2>
+          <label class="field"><span>Table code</span>
+            <input id="code-input" class="code-input" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          </label>
+          <button id="join-btn" class="btn green big">Join table</button>
+          <p class="hint">Got an invite link? It fills the code in for you.</p>
+        </div>
+      </div>
+      <p id="lobby-error" class="error"></p>
+    </div>
+  </section>
+
+  <!-- In-game HUD -->
+  <section id="hud" class="hidden">
+    <div class="top-left">
+      <div class="room-badge" title="Share this code with friends">
+        <span class="lbl">Table</span><span id="room-code">-----</span>
+        <button id="copy-link" class="btn small">Copy invite</button>
+      </div>
+      <div id="status-line" class="status-line"></div>
+      <div id="host-controls" class="host-controls hidden">
+        <button id="start-btn" class="btn gold">Deal cards</button>
+        <button id="pause-btn" class="btn small ghost hidden">Pause after hand</button>
+        <button id="blinds-btn" class="btn small ghost">Blinds…</button>
+      </div>
+    </div>
+
+    <div class="top-right">
+      <div class="seg" id="cam-seg">
+        <button data-cam="seat" class="active" title="Seated view (V)">Seat</button>
+        <button data-cam="overhead" title="Overhead view (V)">Overhead</button>
+        <button data-cam="orbit" title="Free camera (V) — drag to orbit">Free</button>
+      </div>
+      <button id="menu-btn" class="btn small ghost icon" title="Settings">⚙</button>
+      <div id="menu" class="menu hidden">
+        <label>Graphics
+          <select id="quality-select"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        </label>
+        <label class="chk"><input type="checkbox" id="sfx-toggle" checked /> Sound effects</label>
+        <label class="chk"><input type="checkbox" id="amb-toggle" checked /> Casino ambience</label>
+        <label class="chk"><input type="checkbox" id="tiles-toggle" /> Show video tiles</label>
+        <button id="fullscreen-btn" class="btn small ghost">Fullscreen</button>
+        <button id="stand-btn" class="btn small ghost">Stand up</button>
+        <button id="leave-btn" class="btn small red">Leave table</button>
+        <div class="fps" id="fps"></div>
+      </div>
+    </div>
+
+    <div id="banner" class="banner"><div class="b-title"></div><div class="b-sub"></div></div>
+    <div id="toast" class="toast"></div>
+    <div id="tiles" class="tiles hidden"></div>
+
+    <div class="bottom-left">
+      <div class="chat">
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" maxlength="240" placeholder="Say something… (Enter)" autocomplete="off" />
+        </form>
+        <div class="reactions">
+          <button data-emoji="👍">👍</button><button data-emoji="😂">😂</button><button data-emoji="😱">😱</button>
+          <button data-emoji="🔥">🔥</button><button data-emoji="🤔">🤔</button><button data-emoji="💰">💰</button><button data-emoji="🍀">🍀</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-right">
+      <div class="media-panel">
+        <div class="self-wrap hidden" id="self-wrap"><video id="self-video" muted playsinline autoplay></video><div id="self-level" class="self-level"></div></div>
+        <button id="media-start" class="btn gold">🎥 Join with camera &amp; mic</button>
+        <div id="media-controls" class="media-controls hidden">
+          <button id="mic-btn" class="btn small">🎙 Mute</button>
+          <button id="cam-btn" class="btn small">📷 Camera off</button>
+          <button id="media-stop" class="btn small ghost">Stop</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-center">
+      <div id="my-info" class="my-info">
+        <span id="my-hand" class="my-hand"></span>
+        <span id="my-stack" class="my-stack"></span>
+        <button id="sitout-btn" class="btn small ghost">Sit out</button>
+        <button id="rebuy-btn" class="btn small ghost hidden">Top up</button>
+      </div>
+      <div id="action-bar" class="action-bar disabled">
+        <div class="raise-row">
+          <div class="presets">
+            <button data-preset="min">Min</button>
+            <button data-preset="half">½ Pot</button>
+            <button data-preset="threeq">¾ Pot</button>
+            <button data-preset="pot">Pot</button>
+            <button data-preset="allin">All-in</button>
+          </div>
+          <input id="raise-slider" type="range" min="0" max="100" step="1" />
+          <input id="raise-input" type="number" inputmode="numeric" />
+        </div>
+        <div class="btn-row">
+          <button id="fold-btn" class="act fold">Fold <kbd>F</kbd></button>
+          <button id="call-btn" class="act call">Check <kbd>C</kbd></button>
+          <button id="raise-btn" class="act raise">Raise <kbd>R</kbd></button>
+        </div>
+        <div class="pre-row">
+          <label class="chk"><input type="checkbox" id="pre-checkfold" /> Check/Fold</label>
+          <label class="chk"><input type="checkbox" id="pre-callany" /> Check/Call any</label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="blinds-dialog">
+    <form method="dialog">
+      <h3>Change blinds</h3>
+      <p class="hint">Takes effect on the next hand.</p>
+      <select id="blinds-select">
+        <option value="50">25 / 50</option><option value="100">50 / 100</option><option value="200">100 / 200</option>
+        <option value="400">200 / 400</option><option value="600">300 / 600</option><option value="1000">500 / 1,000</option>
+        <option value="2000">1,000 / 2,000</option><option value="5000">2,500 / 5,000</option>
+      </select>
+      <div class="dlg-btns"><button value="cancel" class="btn ghost small">Cancel</button><button value="ok" class="btn gold small">Apply</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

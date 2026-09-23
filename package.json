@@ -1,0 +1,27 @@
+{
+  "name": "vegas-poker",
+  "version": "1.0.0",
+  "description": "3D multiplayer No-Limit Texas Hold'em in the browser with a casino setting, room codes, and webcam/mic at the table.",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test",
+    "docs:sync": "node scripts/sync-docs.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "three": "^0.186.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Guinnessstache/vegas-poker.git"
+  },
+  "homepage": "https://guinnessstache.github.io/vegas-poker/"
+}
