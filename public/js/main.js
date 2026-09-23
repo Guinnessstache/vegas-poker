@@ -375,6 +375,11 @@ function setCam(v) {
   if (v === 'orbit') toast('Free camera: drag to orbit, scroll to zoom');
 }
 document.querySelectorAll('#cam-seg button').forEach((b) => b.addEventListener('click', () => setCam(b.dataset.cam)));
+$('cam-cycle').addEventListener('click', () => {
+  const next = CAMS[(CAMS.indexOf(view.camView) + 1) % CAMS.length];
+  setCam(next);
+  toast({ seat: 'Seated view', overhead: 'Overhead view', orbit: 'Free camera: drag to orbit, pinch to zoom' }[next]);
+});
 
 // Menu
 $('menu-btn').addEventListener('click', () => $('menu').classList.toggle('hidden'));
@@ -395,7 +400,7 @@ setInterval(() => {
   $('fps').textContent = `${f} fps · ${Math.round(world.renderer.getPixelRatio() * 100)}% res · GPU: ${world.gpuName}`;
 }, 1000);
 if (world.softwareGL) {
-  setTimeout(() => toast(`Your browser is drawing 3D without the graphics card (${world.gpuName}). Turn on hardware acceleration in browser settings for smooth play.`, 12000), 1500);
+  setTimeout(() => toast('Your browser is drawing 3D without the graphics card. Turn on hardware acceleration in your browser settings for smooth play (⚙ menu shows the GPU in use).', 12000), 1500);
 }
 
 // Keyboard shortcuts
@@ -459,8 +464,8 @@ $('cam-btn').addEventListener('click', () => { media.toggleCam(); updateMediaBut
 $('media-stop').addEventListener('click', () => { media.stop(); resetMediaUI(); });
 
 function updateMediaButtons() {
-  $('mic-btn').textContent = media.micOn ? '🎙 Mute' : '🔇 Unmute';
-  $('cam-btn').textContent = media.camOn ? '📷 Camera off' : '📷 Camera on';
+  $('mic-btn').innerHTML = media.micOn ? '🎙<span class="lbl-long"> Mute</span>' : '🔇<span class="lbl-long"> Unmute</span>';
+  $('cam-btn').innerHTML = media.camOn ? '📷<span class="lbl-long"> Camera off</span>' : '🚫<span class="lbl-long"> Camera on</span>';
 }
 function resetMediaUI() {
   $('media-start').classList.remove('hidden');

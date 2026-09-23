@@ -90,12 +90,12 @@
     <div class="top-left">
       <div class="room-badge" title="Share this code with friends">
         <span class="lbl">Table</span><span id="room-code">-----</span>
-        <button id="copy-link" class="btn small">Copy invite</button>
+        <button id="copy-link" class="btn small">Copy<span class="lbl-long"> invite</span></button>
       </div>
       <div id="status-line" class="status-line"></div>
       <div id="host-controls" class="host-controls hidden">
         <button id="start-btn" class="btn gold">Deal cards</button>
-        <button id="pause-btn" class="btn small ghost hidden">Pause after hand</button>
+        <button id="pause-btn" class="btn small ghost hidden">Pause<span class="lbl-long"> after hand</span></button>
         <button id="blinds-btn" class="btn small ghost">Blinds…</button>
       </div>
     </div>
@@ -106,6 +106,7 @@
         <button data-cam="overhead" title="Overhead view (V)">Overhead</button>
         <button data-cam="orbit" title="Free camera (V) — drag to orbit">Free</button>
       </div>
+      <button id="cam-cycle" class="btn small ghost icon cam-cycle" title="Change camera view (V)">👁</button>
       <button id="menu-btn" class="btn small ghost icon" title="Settings">⚙</button>
       <div id="menu" class="menu hidden">
         <label>Graphics
@@ -141,11 +142,11 @@
     <div class="bottom-right">
       <div class="media-panel">
         <div class="self-wrap hidden" id="self-wrap"><video id="self-video" muted playsinline autoplay></video><div id="self-level" class="self-level"></div></div>
-        <button id="media-start" class="btn gold">🎥 Join with camera &amp; mic</button>
+        <button id="media-start" class="btn gold" title="Join with camera &amp; mic">🎥<span class="lbl-long"> Join with camera &amp; mic</span></button>
         <div id="media-controls" class="media-controls hidden">
-          <button id="mic-btn" class="btn small">🎙 Mute</button>
-          <button id="cam-btn" class="btn small">📷 Camera off</button>
-          <button id="media-stop" class="btn small ghost">Stop</button>
+          <button id="mic-btn" class="btn small" title="Mute / unmute">🎙<span class="lbl-long"> Mute</span></button>
+          <button id="cam-btn" class="btn small" title="Camera on / off">📷<span class="lbl-long"> Camera off</span></button>
+          <button id="media-stop" class="btn small ghost" title="Stop camera &amp; mic">✕<span class="lbl-long"> Stop</span></button>
         </div>
       </div>
     </div>
