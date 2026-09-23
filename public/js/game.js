@@ -253,6 +253,7 @@ export class GameView {
       });
     }
     if (!t.handOver) this.boardCards.forEach((c) => c.setHighlight(false));
+    this.emitBoard();
     // Dealer button
     if (t.button >= 0) {
       const bp = seatAnchors(t.button).button;
@@ -400,6 +401,7 @@ export class GameView {
         // Sweep old cards back to the dealer.
         const old = [...this.boardCards, ...this.seats.flatMap((s) => s.cards)];
         this.boardCards = [];
+        this.emitBoard();
         this.seats.forEach((s) => { s.cards = []; s.label.hand.textContent = ''; s.avatar.state = 'idle'; });
         this.vm.cards = Array(8).fill(null);
         await Promise.all(old.map((c, k) => c.moveTo(DEALER.muck.clone().setY(CARD_Y + k * 0.001), 0, { duration: 0.35, arc: 0.05 }).then(() => c.dispose())));
@@ -507,6 +509,7 @@ export class GameView {
         }
         await Promise.all(newCards.map(({ c }, k) => wait(k * 0.08).then(() => c.flip(true, 0.35))));
         this.sfx?.play('card');
+        this.emitBoard();
         await wait(0.25);
         break;
       }
@@ -532,6 +535,7 @@ export class GameView {
           const best = new Set(ev.best);
           this.boardCards.forEach((c) => c.setHighlight(best.has(c.card)));
           seat.cards.forEach((c) => c.setHighlight(best.has(c.card)));
+          this.emitBoard(best);
         }
         const name = st?.table.seats[s]?.name || 'Player';
         const potName = ev.potCount > 1 ? (ev.pot === 0 ? 'the main pot' : `side pot ${ev.pot}`) : 'the pot';
@@ -565,6 +569,11 @@ export class GameView {
   }
 
   // ---------------- per-frame ----------------
+  // Tell the HUD which community cards are showing (for the flat on-screen board).
+  emitBoard(best = null) {
+    this.onBoard?.(this.boardCards.filter((c) => c.faceUp && c.card).map((c) => ({ card: c.card, hl: best ? best.has(c.card) : !!c.highlight })), this.state?.table);
+  }
+
   // Float the community cards above the felt, tilted to face the camera.
   updateBoardFloat(dt) {
     const cam = this.world.camera;

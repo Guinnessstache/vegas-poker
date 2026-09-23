@@ -394,7 +394,11 @@ $('amb-toggle').addEventListener('change', (e) => { sfx.setAmbience(e.target.che
 // Readability helpers (default on for phones): flat 2D hole cards + floating community cards.
 const pref = (k, dflt) => { const v = local.get(k); return v === null ? dflt : v === '1'; };
 app.hudCards = pref('hr_hudcards', isMobile);
-view.floatBoard = pref('hr_float', isMobile);
+app.boardHud = pref('hr_boardhud', isMobile);
+view.floatBoard = pref('hr_float', false);
+$('boardhud-toggle').checked = app.boardHud;
+$('boardhud-toggle').addEventListener('change', (e) => { app.boardHud = e.target.checked; local.set('hr_boardhud', e.target.checked ? '1' : '0'); renderBoardStrip(app.lastBoard || [], app.lastTable); });
+view.onBoard = (cards, table) => { app.lastBoard = cards; app.lastTable = table; renderBoardStrip(cards, table); };
 $('hudcards-toggle').checked = app.hudCards;
 $('float-toggle').checked = view.floatBoard;
 $('hudcards-toggle').addEventListener('change', (e) => { app.hudCards = e.target.checked; local.set('hr_hudcards', e.target.checked ? '1' : '0'); app.cardsKey = ''; updateHUD(); });
@@ -523,6 +527,28 @@ function renderMyCards(hole, handNumber) {
   }).join('');
   box.classList.remove('hidden');
   box.classList.remove('deal'); void box.offsetWidth; box.classList.add('deal');
+}
+
+function miniCard(c, extra = '') {
+  const rank = c[0] === 'T' ? '10' : c[0];
+  const red = c[1] === 'h' || c[1] === 'd';
+  return `<span class="mini-card${red ? ' red' : ''}${extra}"><b>${rank}</b><i>${SUIT_SYM[c[1]]}</i></span>`;
+}
+
+// Flat, crisp copy of the community cards (follows the 3D deal animation).
+function renderBoardStrip(cards, table) {
+  const box = $('board-strip');
+  const live = table && table.street !== 'idle';
+  if (!app.boardHud || !live || !app.state || app.state.you.seat < 0) { box.classList.add('hidden'); box.innerHTML = ''; app.boardKey = ''; return; }
+  const key = cards.map((c) => c.card + (c.hl ? '*' : '')).join(',');
+  if (key === app.boardKey && box.children.length) return;
+  const prev = app.boardKey ? app.boardKey.split(',').length : 0;
+  app.boardKey = key;
+  const anyHl = cards.some((c) => c.hl);
+  let html = cards.map((c, i) => miniCard(c.card, `${c.hl ? ' hl' : anyHl ? ' dim' : ''}${i >= prev && key ? ' fresh' : ''}`)).join('');
+  for (let i = cards.length; i < 5; i++) html += '<span class="mini-card empty"></span>';
+  box.innerHTML = html;
+  box.classList.remove('hidden');
 }
 
 // ---------------- banner / toast ----------------
