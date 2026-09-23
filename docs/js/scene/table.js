@@ -213,7 +213,7 @@ export function buildTable(quality = 'high') {
   g.add(dealerButton);
 
   // Turn indicator glow ring (moved to the active seat).
-  const ringGeo = new THREE.RingGeometry(0.12, 0.15, 48);
+  const ringGeo = new THREE.RingGeometry(0.115, 0.15, 64, 1, Math.PI / 2, Math.PI * 2);
   ringGeo.rotateX(-Math.PI / 2);
   const turnRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffd36b, transparent: true, opacity: 0.0, depthWrite: false, toneMapped: false }));
   turnRing.position.y = height + 0.002;

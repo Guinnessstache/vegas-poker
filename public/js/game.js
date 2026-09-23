@@ -342,13 +342,19 @@ export class GameView {
     for (let i = 0; i < TABLE.seats; i++) {
       const L = this.seats[i].label;
       if (t.toAct === i && st.deadline) {
-        const total = Math.max(1, st.deadline - (st.turnStart || st.deadline - 30000));
+        const total = Math.max(1, st.turnTotal || st.deadline - (st.turnStart || st.deadline - 30000));
         const left = Math.max(0, st.deadline - now);
         L.timerWrap.style.display = '';
         L.timer.style.width = `${(left / total) * 100}%`;
         L.timer.style.background = left < 5000 ? '#ff4d4d' : left < 10000 ? '#ffc53d' : '#5ee08a';
       } else L.timerWrap.style.display = 'none';
     }
+    // Shared countdown for the HUD (everyone sees whose turn it is and how long is left).
+    if (t.toAct >= 0 && st.deadline && !t.handOver) {
+      const total = Math.max(1, st.turnTotal || 30000);
+      const left = Math.max(0, st.deadline - now);
+      this.onTimer?.({ seat: t.toAct, name: t.seats[t.toAct]?.name || '', left, total, mine: t.toAct === this.mySeat });
+    } else this.onTimer?.(null);
   }
 
   showAction(seat, text, cls = '') {
@@ -608,8 +614,23 @@ export class GameView {
     const toAct = this.state?.table.toAct;
     for (const s of this.seats) s.avatar.update(dt, this.world.camera, toAct === s.i);
     this.dealer.update(dt);
+    // Turn ring on the felt doubles as a countdown: the arc drains and shifts green -> amber -> red.
     const ring = this.world.table.turnRing;
-    if (ring.visible) ring.material.opacity = 0.45 + Math.sin(this.world.time * 4) * 0.25;
+    if (ring.visible) {
+      const st = this.state;
+      const total = Math.max(1, st?.turnTotal || 30000);
+      const left = st?.deadline ? Math.max(0, st.deadline - Date.now()) : total;
+      const frac = Math.min(1, left / total);
+      const segs = ring.geometry.parameters.thetaSegments;
+      ring.geometry.setDrawRange(0, Math.max(1, Math.ceil(frac * segs)) * 6);
+      ring.material.color.set(left < 5000 ? 0xff4d4d : left < 10000 ? 0xffc53d : 0x5ee08a);
+      const urgent = left < 5000;
+      ring.material.opacity = urgent ? 0.6 + Math.sin(this.world.time * 12) * 0.35 : 0.85;
+      if (urgent && this.mySeat === st?.table.toAct) {
+        const sec = Math.ceil(left / 1000);
+        if (sec !== this.lastTick && sec > 0) { this.lastTick = sec; this.sfx?.play('tick'); }
+      }
+    }
     this.timerAcc = (this.timerAcc || 0) + dt;
     if (this.timerAcc > 0.2) { this.timerAcc = 0; this.updateTimers(); }
   }

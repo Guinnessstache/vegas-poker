@@ -37,6 +37,18 @@ const view = new GameView(world, {
   onSeatClick: (seat) => emit('sit', { seat }),
 });
 view.onBanner = showBanner;
+view.onTimer = (info) => {
+  const el = $('turn-timer');
+  if (!info) { el.classList.add('hidden'); return; }
+  const secs = Math.ceil(info.left / 1000);
+  el.classList.remove('hidden');
+  el.classList.toggle('mine', info.mine);
+  el.classList.toggle('warn', info.left < 10000 && info.left >= 5000);
+  el.classList.toggle('urgent', info.left < 5000);
+  el.querySelector('.tt-name').textContent = info.mine ? 'Your turn' : `${info.name} is thinking…`;
+  el.querySelector('.tt-secs').textContent = `${secs}s`;
+  el.querySelector('.tt-bar > div').style.width = `${(info.left / info.total) * 100}%`;
+};
 world.onResize = () => view.applyCamera(); // re-aim when rotating the phone
 
 const socket = io({ transports: ['websocket', 'polling'] });

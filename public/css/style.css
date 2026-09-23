@@ -132,6 +132,17 @@ button, input, select { font: inherit; color: inherit; }
 .mini-card b { font-size: 26px; font-weight: 700; letter-spacing: -1px; }
 .mini-card i { font-style: normal; font-size: 24px; margin-top: 2px; }
 .mini-card.red { color: #c8102e; }
+.turn-timer { position: relative; display: flex; align-items: center; gap: 10px; padding: 6px 14px 9px; min-width: 220px; background: rgba(10, 5, 3, .72); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); font-size: 14px; font-weight: 700; }
+.tt-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.tt-secs { font-variant-numeric: tabular-nums; color: #5ee08a; font-size: 16px; }
+.tt-bar { position: absolute; left: 10px; right: 10px; bottom: 4px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.tt-bar > div { height: 100%; width: 100%; background: #5ee08a; transition: width .2s linear, background .3s; }
+.turn-timer.warn .tt-secs { color: #ffc53d; } .turn-timer.warn .tt-bar > div { background: #ffc53d; }
+.turn-timer.urgent .tt-secs { color: #ff4d4d; } .turn-timer.urgent .tt-bar > div { background: #ff4d4d; }
+.turn-timer.mine { border-color: var(--gold); color: var(--gold); }
+.turn-timer.mine.urgent { animation: urgentPulse .6s ease-in-out infinite alternate; }
+@keyframes urgentPulse { to { box-shadow: 0 0 0 3px rgba(255, 77, 77, .45); } }
+@media (max-width: 640px) { .turn-timer { min-width: 0; padding: 4px 12px 8px; font-size: 13px; } }
 .board-strip { display: flex; gap: 5px; justify-content: center; padding: 6px 8px; background: rgba(10, 5, 3, .55); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); }
 .board-strip .mini-card { transform: none; width: 64px; height: 90px; border-radius: 8px; }
 .board-strip .mini-card b { font-size: 36px; }

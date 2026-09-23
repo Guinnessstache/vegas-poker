@@ -262,6 +262,7 @@ export class Room {
     if (!m || !m.connected) ms = 6000;
     if (p?.sittingOut) ms = 1500;
     this.deadline = Date.now() + ms;
+    this.turnTotal = ms;
     const hand = t.handNumber;
     this.timers.turn = setTimeout(() => {
       if (t.toAct !== seat || t.handNumber !== hand) return;
@@ -373,6 +374,7 @@ export class Room {
     this.io.to(m.socketId).emit('state', {
       table: t.publicState(),
       deadline: this.deadline,
+      turnTotal: this.turnTotal || 0,
       serverNow: Date.now(),
       you: {
         pid: m.pid,

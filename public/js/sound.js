@@ -102,6 +102,9 @@ export class Sound {
         [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone({ at: i * 0.08, freq: f, dur: 0.45, gain: 0.1, type: 'triangle' }));
         for (let i = 0; i < 10; i++) this.burst({ at: 0.4 + i * 0.04, dur: 0.04, freq: 3500 + Math.random() * 2000, q: 5, gain: 0.3 });
         break;
+      case 'tick':
+        this.tone({ freq: 1500, dur: 0.05, gain: 0.08, type: 'square' });
+        break;
       case 'chat':
         this.tone({ freq: 1200, dur: 0.08, gain: 0.05 });
         break;
