@@ -424,6 +424,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'f') $('fold-btn').click();
   else if (k === 'c') $('call-btn').click();
   else if (k === 'r') $('raise-btn').click();
+  else if (k === 'b') { $('boardhud-toggle').click(); toast(`Board cards on screen: ${app.boardHud ? 'on' : 'off'} (B)`); }
   else if (k === 'v') setCam(CAMS[(CAMS.indexOf(view.camView) + 1) % CAMS.length]);
   else if (k === 'enter' && app.code) { $('chat-input').focus(); e.preventDefault(); }
 });

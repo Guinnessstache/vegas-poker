@@ -133,9 +133,16 @@ button, input, select { font: inherit; color: inherit; }
 .mini-card i { font-style: normal; font-size: 24px; margin-top: 2px; }
 .mini-card.red { color: #c8102e; }
 .board-strip { display: flex; gap: 5px; justify-content: center; padding: 6px 8px; background: rgba(10, 5, 3, .55); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); }
-.board-strip .mini-card { transform: none; width: 44px; height: 62px; }
-.board-strip .mini-card b { font-size: 24px; }
-.board-strip .mini-card i { font-size: 22px; }
+.board-strip .mini-card { transform: none; width: 64px; height: 90px; border-radius: 8px; }
+.board-strip .mini-card b { font-size: 36px; }
+.board-strip .mini-card i { font-size: 32px; }
+.board-strip { gap: 8px; padding: 8px 12px; }
+@media (max-width: 640px) {
+  .board-strip { gap: 5px; padding: 6px 8px; }
+  .board-strip .mini-card { width: 44px; height: 62px; border-radius: 6px; }
+  .board-strip .mini-card b { font-size: 24px; }
+  .board-strip .mini-card i { font-size: 22px; }
+}
 .board-strip .mini-card.empty { background: transparent; border: 1px dashed rgba(232, 192, 96, .35); box-shadow: none; }
 .board-strip .mini-card.hl { box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(255, 210, 90, .7); transform: translateY(-4px); }
 .board-strip .mini-card.dim { opacity: .45; }
@@ -260,3 +267,4 @@ dialog select { width: 100%; margin-top: 10px; background: #000; border: 1px sol
   .toast.show { transform: translate(-50%, 0); }
   .banner { top: 30%; padding: 10px 16px; max-width: calc(100vw - 24px); }
 }
+.menu kbd { font-size: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: auto; color: var(--muted); }
