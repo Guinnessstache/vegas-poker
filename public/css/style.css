@@ -125,6 +125,16 @@ button, input, select { font: inherit; color: inherit; }
 .bottom-center { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(560px, calc(100vw - 720px)); min-width: 360px; }
 .my-info { display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 6px 5px 16px; backdrop-filter: blur(8px); font-size: 14px; }
 .my-hand { color: var(--gold); font-weight: 700; }
+.my-cards { display: inline-flex; gap: 4px; margin: -18px 0 -4px -8px; align-self: flex-end; }
+.mini-card { width: 46px; height: 64px; border-radius: 6px; background: linear-gradient(180deg, #fffdf8, #efe8da); color: #111418; border: 1px solid #cfc8b8; box-shadow: 0 4px 14px rgba(0, 0, 0, .55); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; font-family: Georgia, 'Times New Roman', serif; }
+.mini-card:first-child { transform: rotate(-6deg) translateY(2px); }
+.mini-card:last-child { transform: rotate(5deg); }
+.mini-card b { font-size: 26px; font-weight: 700; letter-spacing: -1px; }
+.mini-card i { font-style: normal; font-size: 24px; margin-top: 2px; }
+.mini-card.red { color: #c8102e; }
+.my-cards.deal .mini-card { animation: dealIn .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.my-cards.deal .mini-card:last-child { animation-delay: .12s; }
+@keyframes dealIn { from { opacity: 0; transform: translateY(24px) rotate(0) scale(.8); } }
 .my-hand:empty { display: none; }
 .my-stack { font-weight: 700; }
 .my-stack::before { content: '● '; color: var(--gold); }

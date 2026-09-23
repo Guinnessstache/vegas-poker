@@ -14,7 +14,7 @@ import { updateTweens } from './tween.js';
 
 export const QUALITY = {
   low: { pixelRatio: 1, shadows: false, bloom: false, shadowMap: 512, antialias: false },
-  medium: { pixelRatio: 1.25, shadows: true, bloom: true, shadowMap: 1024, antialias: true },
+  medium: { pixelRatio: 1.6, shadows: true, bloom: true, shadowMap: 1024, antialias: true },
   high: { pixelRatio: 2, shadows: true, bloom: true, shadowMap: 2048, antialias: true },
 };
 
@@ -34,7 +34,7 @@ export class World {
     renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(renderer.domElement);
     this.renderer = renderer;
-    setMaxAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
+    setMaxAnisotropy(Math.min(16, renderer.capabilities.getMaxAnisotropy()));
 
     // Which GPU is the browser actually using? (Software fallbacks run 10-50x slower.)
     const gl = renderer.getContext();
@@ -126,6 +126,7 @@ export class World {
     this.fps = 60;
     this.frameCount = 0;
     this.fpsTime = 0;
+    this.resize(); // apply portrait/landscape FOV right away
     renderer.setAnimationLoop(() => this.frame());
   }
 
@@ -166,6 +167,7 @@ export class World {
     this.camera.fov = w / h < 1 ? 72 : w / h < 1.4 ? 62 : 54;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.onResize?.();
     this.composer.setSize(w, h);
     this.labelRenderer.setSize(w, h);
   }

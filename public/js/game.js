@@ -28,6 +28,9 @@ export class GameView {
     this.vm = { stacks: Array(8).fill(0), bets: Array(8).fill(0), pot: 0, cards: Array(8).fill(null), inHand: Array(8).fill(false) };
     this.boardCards = [];
     this.camView = 'seat';
+    this.floatBoard = false; // tilt community cards up toward the camera (great on phones)
+    this._q = new THREE.Quaternion();
+    this._m = new THREE.Matrix4();
 
     this.tableGroup = new THREE.Group();
     this.scene.add(this.tableGroup);
@@ -139,8 +142,10 @@ export class GameView {
   // ---------------- camera ----------------
   seatCamera(i) {
     const a = seatAnchors(i);
-    const pos = stadiumPoint(a.theta, TABLE.railW + 0.62).setY(1.62);
-    const look = new THREE.Vector3(0, Y, -0.12).lerp(a.cards.clone().setY(Y), 0.32);
+    // Portrait phones: sit a bit closer and aim at the board (your cards are shown flat in the HUD).
+    const portrait = this.world.camera.aspect < 1;
+    const pos = stadiumPoint(a.theta, TABLE.railW + (portrait ? 0.34 : 0.62)).setY(portrait ? 1.5 : 1.62);
+    const look = new THREE.Vector3(0, Y, -0.12).lerp(a.cards.clone().setY(Y), portrait ? 0.12 : 0.32);
     return { pos, look };
   }
 
@@ -560,7 +565,37 @@ export class GameView {
   }
 
   // ---------------- per-frame ----------------
+  // Float the community cards above the felt, tilted to face the camera.
+  updateBoardFloat(dt) {
+    const cam = this.world.camera;
+    const k = 1 - Math.exp(-dt * 6);
+    const up = new THREE.Vector3(0, 1, 0);
+    this.boardCards.forEach((c, i) => {
+      const lift = c.lift;
+      const on = this.floatBoard && !c.root.userData.moving;
+      const targetY = on ? 0.075 + Math.sin(this.world.time * 1.4 + i * 0.7) * 0.006 : 0;
+      lift.position.y += (targetY - lift.position.y) * k;
+      const targetS = on ? 1.12 : 1;
+      lift.scale.setScalar(lift.scale.x + (targetS - lift.scale.x) * k);
+      if (!on) { lift.quaternion.slerp(this._q.identity(), k); return; }
+      const pos = new THREE.Vector3();
+      c.root.getWorldPosition(pos);
+      pos.y += lift.position.y;
+      const n = cam.position.clone().sub(pos).normalize();          // card face normal -> camera
+      const top = up.clone().addScaledVector(n, -up.dot(n)).normalize(); // screen-up
+      const z = top.clone().negate();                               // card top edge is local -Z
+      const x = new THREE.Vector3().crossVectors(n, z);
+      this._m.makeBasis(x, n, z);
+      const world = new THREE.Quaternion().setFromRotationMatrix(this._m);
+      // Tilt most of the way (not fully vertical) so it still reads as "on the table".
+      const target = new THREE.Quaternion().slerpQuaternions(new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(-n.x, -n.z) + Math.PI), world, 0.8);
+      const parentInv = c.root.getWorldQuaternion(new THREE.Quaternion()).invert();
+      lift.quaternion.slerp(parentInv.multiply(target), k);
+    });
+  }
+
   update(dt) {
+    this.updateBoardFloat(dt);
     const toAct = this.state?.table.toAct;
     for (const s of this.seats) s.avatar.update(dt, this.world.camera, toAct === s.i);
     this.dealer.update(dt);

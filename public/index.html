@@ -114,6 +114,8 @@
         </label>
         <label class="chk"><input type="checkbox" id="sfx-toggle" checked /> Sound effects</label>
         <label class="chk"><input type="checkbox" id="amb-toggle" checked /> Casino ambience</label>
+        <label class="chk"><input type="checkbox" id="hudcards-toggle" /> My cards on screen</label>
+        <label class="chk"><input type="checkbox" id="float-toggle" /> Floating board cards</label>
         <label class="chk"><input type="checkbox" id="tiles-toggle" /> Show video tiles</label>
         <button id="fullscreen-btn" class="btn small ghost">Fullscreen</button>
         <button id="stand-btn" class="btn small ghost">Stand up</button>
@@ -153,6 +155,7 @@
 
     <div class="bottom-center">
       <div id="my-info" class="my-info">
+        <span id="my-cards" class="my-cards hidden" aria-label="Your cards"></span>
         <span id="my-hand" class="my-hand"></span>
         <span id="my-stack" class="my-stack"></span>
         <button id="sitout-btn" class="btn small ghost">Sit out</button>

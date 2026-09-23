@@ -95,7 +95,8 @@ export const SUIT_COLOR = { h: '#c8102e', d: '#c8102e', s: '#111418', c: '#11141
 const RANK_LABEL = { T: '10' };
 
 // ---------------- Cards ----------------
-export const CARD_W = 200, CARD_H = 280;
+export const CARD_W = 256, CARD_H = 358; // atlas cell size (drawn at 200x280 units, scaled up)
+const BASE_W = 200, BASE_H = 280;
 const ATLAS_COLS = 13, ATLAS_ROWS = 5; // row 4 = back
 
 const PIPS = {
@@ -112,9 +113,10 @@ const PIPS = {
 };
 
 function drawCardFace(ctx, ox, oy, rank, suit) {
-  const w = CARD_W, h = CARD_H;
+  const w = BASE_W, h = BASE_H;
   ctx.save();
   ctx.translate(ox, oy);
+  ctx.scale(CARD_W / BASE_W, CARD_H / BASE_H);
   // Base
   roundRect(ctx, 2, 2, w - 4, h - 4, 16);
   const g = ctx.createLinearGradient(0, 0, w, h);
@@ -195,9 +197,10 @@ function drawCardFace(ctx, ox, oy, rank, suit) {
 }
 
 function drawCardBack(ctx, ox, oy) {
-  const w = CARD_W, h = CARD_H;
+  const w = BASE_W, h = BASE_H;
   ctx.save();
   ctx.translate(ox, oy);
+  ctx.scale(CARD_W / BASE_W, CARD_H / BASE_H);
   roundRect(ctx, 2, 2, w - 4, h - 4, 16);
   ctx.fillStyle = '#f8f4ea'; ctx.fill();
   roundRect(ctx, 12, 12, w - 24, h - 24, 10);

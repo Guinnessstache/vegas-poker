@@ -37,6 +37,7 @@ const view = new GameView(world, {
   onSeatClick: (seat) => emit('sit', { seat }),
 });
 view.onBanner = showBanner;
+world.onResize = () => view.applyCamera(); // re-aim when rotating the phone
 
 const socket = io({ transports: ['websocket', 'polling'] });
 const media = new MediaManager(socket, {
@@ -227,6 +228,7 @@ function updateHUD() {
       try { hint = evaluate([...you.hole, ...t.board]).name; } catch { hint = ''; }
     }
     $('my-hand').textContent = hint;
+    renderMyCards(app.hudCards && me.inHand && !me.folded ? you.hole : [], t.handNumber);
   }
 
   // Action bar
@@ -389,6 +391,14 @@ $('sfx-toggle').checked = sfx.sfxOn;
 $('sfx-toggle').addEventListener('change', (e) => { sfx.sfxOn = e.target.checked; local.set('hr_sfx', e.target.checked ? '1' : '0'); });
 $('amb-toggle').checked = local.get('hr_amb') !== '0';
 $('amb-toggle').addEventListener('change', (e) => { sfx.setAmbience(e.target.checked); local.set('hr_amb', e.target.checked ? '1' : '0'); });
+// Readability helpers (default on for phones): flat 2D hole cards + floating community cards.
+const pref = (k, dflt) => { const v = local.get(k); return v === null ? dflt : v === '1'; };
+app.hudCards = pref('hr_hudcards', isMobile);
+view.floatBoard = pref('hr_float', isMobile);
+$('hudcards-toggle').checked = app.hudCards;
+$('float-toggle').checked = view.floatBoard;
+$('hudcards-toggle').addEventListener('change', (e) => { app.hudCards = e.target.checked; local.set('hr_hudcards', e.target.checked ? '1' : '0'); app.cardsKey = ''; updateHUD(); });
+$('float-toggle').addEventListener('change', (e) => { view.floatBoard = e.target.checked; local.set('hr_float', e.target.checked ? '1' : '0'); });
 $('tiles-toggle').addEventListener('change', (e) => { $('tiles').classList.toggle('hidden', !e.target.checked); renderTiles(); });
 $('fullscreen-btn').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.();
@@ -496,6 +506,23 @@ function renderTiles() {
     if (v.srcObject !== src) { v.srcObject = src; v.play().catch(() => {}); }
     el.querySelector('span').textContent = m.name;
   }
+}
+
+// Crisp 2D copy of your hole cards (DOM, so it's sharp at any screen density).
+const SUIT_SYM = { s: '\u2660\uFE0E', h: '\u2665\uFE0E', d: '\u2666\uFE0E', c: '\u2663\uFE0E' };
+function renderMyCards(hole, handNumber) {
+  const box = $('my-cards');
+  const key = hole.join(',') + '|' + handNumber;
+  if (key === app.cardsKey) return;
+  app.cardsKey = key;
+  if (hole.length !== 2) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.innerHTML = hole.map((c) => {
+    const rank = c[0] === 'T' ? '10' : c[0];
+    const red = c[1] === 'h' || c[1] === 'd';
+    return `<span class="mini-card${red ? ' red' : ''}"><b>${rank}</b><i>${SUIT_SYM[c[1]]}</i></span>`;
+  }).join('');
+  box.classList.remove('hidden');
+  box.classList.remove('deal'); void box.offsetWidth; box.classList.add('deal');
 }
 
 // ---------------- banner / toast ----------------

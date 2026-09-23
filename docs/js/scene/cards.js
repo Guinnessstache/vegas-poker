@@ -28,8 +28,10 @@ export class Card3D {
   constructor(card = null) {
     ensureShared();
     this.root = new THREE.Group();     // position + yaw
+    this.lift = new THREE.Group();     // optional float/tilt toward the viewer
     this.flipper = new THREE.Group();  // flip around long axis + tilt
-    this.root.add(this.flipper);
+    this.root.add(this.lift);
+    this.lift.add(this.flipper);
     this.front = new THREE.Mesh(geo, backMat);
     this.front.position.y = THICK / 2;
     this.back = new THREE.Mesh(geo, backMat);
@@ -71,6 +73,7 @@ export class Card3D {
   async moveTo(pos, yaw = this.root.rotation.y, { duration = 0.45, arc = 0.12, spin = 0, easing = ease.outCubic } = {}) {
     const p0 = this.root.position.clone();
     const y0 = this.root.rotation.y;
+    this.root.userData.moving = true;
     let dy = yaw - y0;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
@@ -79,6 +82,7 @@ export class Card3D {
       this.root.position.y += Math.sin(t * Math.PI) * arc;
       this.root.rotation.y = y0 + dy * t + Math.sin(t * Math.PI) * spin;
     }, easing);
+    this.root.userData.moving = false;
   }
 
   setHighlight(on) {
