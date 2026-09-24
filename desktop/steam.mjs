@@ -42,12 +42,44 @@ function loadFlatApi() {
       lobbyDistanceFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListDistanceFilter(void *self, int filter)'),
       lobbyCountFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListResultCountFilter(void *self, int max)'),
     };
+    try {
+      f.net = {
+        messages: lib.func('void *SteamAPI_SteamNetworkingMessages_SteamAPI_v002()'),
+        utils: lib.func('void *SteamAPI_SteamNetworkingUtils_SteamAPI_v004()'),
+        initRelay: lib.func('void SteamAPI_ISteamNetworkingUtils_InitRelayNetworkAccess(void *self)'),
+        setId: lib.func('void SteamAPI_SteamNetworkingIdentity_SetSteamID64(_Inout_ uint8_t *identity, uint64_t id)'),
+        send: lib.func('int SteamAPI_ISteamNetworkingMessages_SendMessageToUser(void *self, const uint8_t *identity, const uint8_t *data, uint32_t size, int flags, int channel)'),
+        receive: lib.func('int SteamAPI_ISteamNetworkingMessages_ReceiveMessagesOnChannel(void *self, int channel, _Out_ void **msgs, int max)'),
+        release: lib.func('void SteamAPI_SteamNetworkingMessage_t_Release(void *msg)'),
+        accept: lib.func('bool SteamAPI_ISteamNetworkingMessages_AcceptSessionWithUser(void *self, const uint8_t *identity)'),
+        close: lib.func('bool SteamAPI_ISteamNetworkingMessages_CloseSessionWithUser(void *self, const uint8_t *identity)'),
+        info: lib.func('int SteamAPI_ISteamNetworkingMessages_GetSessionConnectionInfo(void *self, const uint8_t *identity, _Out_ uint8_t *info, _Out_ uint8_t *status)'),
+        decode: (ptr, offset, type) => koffi.decode(ptr, offset, type),
+        // Copy bytes out of Steam's memory. (koffi.view would expose it directly, but Electron's
+        // V8 sandbox forbids memory from outside and aborts the whole app.)
+        copy: (ptr, len) => Buffer.from(koffi.decode(ptr, 0, koffi.array('uint8_t', len, 'Typed'))),
+      };
+    } catch (e) {
+      console.warn('[steam] networking messages API unavailable:', e.message);
+    }
     return f;
   } catch (e) {
     console.warn('[steam] flat API bind failed:', e.message);
     return null;
   }
 }
+
+// ISteamNetworkingMessages: Valve's current peer-to-peer API. Handles NAT traversal and falls
+// back to Valve's relay network (SDR) automatically, which the old ISteamNetworking API
+// doesn't do reliably on strict networks such as phone hotspots.
+const NET_CHANNEL = 7;
+const SEND_RELIABLE = 8;
+const SEND_AUTO_RESTART = 32;
+const RESULT_OK = 1;
+const MSG_OFF_DATA = 0; // SteamNetworkingMessage_t layout (same with 4- and 8-byte packing)
+const MSG_OFF_SIZE = 8;
+const MSG_OFF_PEER_STEAMID = 24; // m_identityPeer (offset 16) + union (offset 8)
+const CONN_STATES = { 0: 'none', 1: 'connecting', 2: 'finding route', 3: 'connected', 4: 'closed by peer', 5: 'problem detected' };
 
 const GAME_TAG = 'high-roller-holdem-p2p-1'; // lobbies from this version of the game
 const PERSONA = ['Offline', 'Online', 'Busy', 'Away', 'Snooze', 'Looking to trade', 'Looking to play', 'Invisible'];
@@ -202,6 +234,62 @@ export class Steam {
   startNetworking({ onPacket, onPeerFailed }) {
     if (!this.client) return false;
     if (this._net) return true;
+    const net = this.flatApi()?.net;
+    if (net) {
+      try { return this.startMessages(net, onPacket); } catch (e) { console.warn('[steam] networking messages failed, using old P2P API:', e); }
+    }
+    return this.startLegacyP2P({ onPacket, onPeerFailed });
+  }
+
+  startMessages(net, onPacket) {
+    const self = net.messages();
+    const utils = net.utils();
+    if (!self) throw new Error('SteamNetworkingMessages not available');
+    try { net.initRelay(utils); } catch (e) { console.warn('[steam] relay init', e.message); }
+    this._msg = { net, self, ids: new Map(), warned: 0 };
+    const identity = (peer) => {
+      let id = this._msg.ids.get(peer);
+      if (!id) { id = Buffer.alloc(136); net.setId(id, BigInt(peer)); this._msg.ids.set(peer, id); }
+      return id;
+    };
+    this._msg.identity = identity;
+    const box = new Array(64).fill(null);
+    this._net = setInterval(() => {
+      for (let round = 0; round < 16; round++) {
+        const n = net.receive(self, NET_CHANNEL, box, box.length);
+        if (n <= 0) break;
+        for (let i = 0; i < n; i++) {
+          const m = box[i];
+          try {
+            const size = net.decode(m, MSG_OFF_SIZE, 'int');
+            const peer = String(net.decode(m, MSG_OFF_PEER_STEAMID, 'uint64_t'));
+            const data = size > 0 ? net.copy(net.decode(m, MSG_OFF_DATA, 'void *'), size) : Buffer.alloc(0);
+            onPacket(peer, data);
+          } catch (e) {
+            console.warn('[steam] bad message', e);
+          } finally {
+            net.release(m);
+          }
+        }
+        if (n < box.length) break;
+      }
+    }, 4);
+    // Accept connections from players in our lobby (the tunnel still checks every connection).
+    this._accept = setInterval(() => {
+      if (!this.lobby) return;
+      const me = this.mySteamId;
+      try {
+        for (const m of this.lobby.getMembers()) {
+          const id = String(m.steamId64);
+          if (id !== me) net.accept(self, identity(id));
+        }
+      } catch { /* ignore */ }
+    }, 250);
+    console.log('[steam] networking: SteamNetworkingMessages (relay-capable)');
+    return true;
+  }
+
+  startLegacyP2P({ onPacket, onPeerFailed }) {
     const n = this.client.networking;
     const cb = this.client.callback;
     cb.register(steamworks.SteamCallback.P2PSessionRequest, ({ remote }) => {
@@ -218,12 +306,29 @@ export class Steam {
         try { onPacket(String(p.steamId.steamId64), p.data); } catch (e) { console.warn('[steam] packet handler', e); }
       }
     }, 4);
+    console.log('[steam] networking: legacy ISteamNetworking P2P');
     return true;
   }
 
   sendPacket(steamId, buf) {
     if (!this.client) return false;
+    if (this._msg) {
+      const { net, self, identity } = this._msg;
+      const r = net.send(self, identity(String(steamId)), buf, buf.length, SEND_RELIABLE | SEND_AUTO_RESTART, NET_CHANNEL);
+      if (r !== RESULT_OK && this._msg.warned++ < 20) console.warn('[steam] send to', String(steamId), 'result', r);
+      return r === RESULT_OK;
+    }
     return this.client.networking.sendP2PPacket(BigInt(steamId), 2 /* Reliable */, buf);
+  }
+
+  // Connection state and ping to a peer, for the log.
+  peerStatus(steamId) {
+    if (!this._msg) return null;
+    const { net, self, identity } = this._msg;
+    const status = Buffer.alloc(512);
+    const info = Buffer.alloc(1024);
+    const state = net.info(self, identity(String(steamId)), info, status);
+    return { state: CONN_STATES[state] || String(state), ping: status.readInt32LE(4) };
   }
 
   invite() {

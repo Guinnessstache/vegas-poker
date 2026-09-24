@@ -311,3 +311,5 @@ dialog select { width: 100%; margin-top: 10px; background: #000; border: 1px sol
 .sf-row .sf-status.on { color: #57cbff; }
 .sf-row button.done, .sf-row button.done:disabled { opacity: 1; background: #1f5f35; border-color: #3ddc84; color: #bfffd4; }
 .sf-empty { color: var(--muted); padding: 16px; text-align: center; }
+
+.lobby-foot { text-align: center; margin: 6px 0 0; }

@@ -5,7 +5,7 @@
 //   Steam ID, and game traffic is tunneled over Steam peer-to-peer (relayed by Valve when needed).
 import { app, BrowserWindow, ipcMain, session, shell, Menu } from 'electron';
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Steam, enableOverlay, restartThroughSteamIfNeeded } from './steam.mjs';
 import { Tunnel } from './tunnel.mjs';
@@ -28,6 +28,26 @@ if (process.env.HR_NO_SANDBOX) app.commandLine.appendSwitch('no-sandbox');
 // One running copy; a second launch (e.g. accepting an invite) is forwarded here.
 if (!app.requestSingleInstanceLock()) app.exit(0);
 
+// Everything the main process logs also goes to <userData>/highroller.log (Settings → Open log file).
+let LOG_FILE = null;
+function setupLogFile() {
+  try {
+    const dir = app.getPath('userData');
+    mkdirSync(dir, { recursive: true });
+    LOG_FILE = path.join(dir, 'highroller.log');
+    writeFileSync(LOG_FILE, `High Roller Hold'em ${app.getVersion()} — ${process.platform} — ${new Date().toISOString()}\n`);
+    const fmt = (x) => (typeof x === 'string' ? x : x instanceof Error ? (x.stack || x.message)
+      : JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? String(v) : v)));
+    for (const level of ['log', 'warn', 'error']) {
+      const orig = console[level].bind(console);
+      console[level] = (...args) => {
+        orig(...args);
+        try { appendFileSync(LOG_FILE, `${new Date().toISOString().slice(11, 23)} ${level === 'log' ? '' : `${level.toUpperCase()} `}${args.map(fmt).join(' ')}\n`); } catch { /* ignore */ }
+      };
+    }
+  } catch { /* logging is best-effort */ }
+}
+
 let win = null;
 let steam = null;
 let localServer = null;
@@ -47,6 +67,7 @@ async function connectLobby(lobbyId) {
   if (t.host === steam.mySteamId) return { self: true, code: t.code };
   if (!t.hostHere) { steam.leave(); return { error: 'That table has closed (the host left).' }; }
   const port = await tunnel.connectTo(t.host);
+  console.log('[tunnel] joining table', t.code, 'hosted by', t.host);
   return { code: t.code, server: `http://127.0.0.1:${port}`, via: 'steam' };
 }
 
@@ -72,13 +93,23 @@ async function createWindow() {
     send: (peer, buf) => steam.sendPacket(peer, buf),
     localPort: localServer.port,
     authorize: (peer) => steam.isHosting() && steam.isLobbyMember(peer),
-    onHostLost: () => { steam.leave(); win?.webContents.send('hr:host-lost'); },
+    onHostLost: (peer) => {
+      console.warn('[tunnel] lost the host', peer, 'status', steam.peerStatus?.(peer));
+      steam.leave();
+      win?.webContents.send('hr:host-lost');
+    },
     log: (...a) => console.log(...a),
   });
   steam.startNetworking({
     onPacket: (peer, data) => tunnel.handlePacket(peer, data),
-    onPeerFailed: (peer) => tunnel.dropPeer(peer),
+    onPeerFailed: (peer) => { console.warn('[steam] P2P session failed with', peer); tunnel.dropPeer(peer); },
   });
+  // Connection health for the log: state (connecting / finding route / connected) and ping.
+  setInterval(() => {
+    const host = tunnel.clientPeer;
+    if (host) console.log('[net] host', host, steam.peerStatus?.(host));
+    for (const guest of tunnel.seen.keys()) console.log('[net] guest', guest, steam.peerStatus?.(guest));
+  }, 5000).unref();
 
   win = new BrowserWindow({
     width: 1600,
@@ -162,6 +193,7 @@ ipcMain.handle('hr:achievement', (_e, name) => steam?.unlock(String(name)) ?? fa
 ipcMain.handle('hr:overlay', (_e, dialog) => { steam?.openOverlay(dialog); return true; });
 ipcMain.handle('hr:fullscreen', (_e, on) => { win?.setFullScreen(on == null ? !win.isFullScreen() : !!on); return win?.isFullScreen(); });
 ipcMain.handle('hr:quit', () => app.quit());
+ipcMain.handle('hr:open-log', () => { if (LOG_FILE) shell.showItemInFolder(LOG_FILE); return LOG_FILE; });
 
 app.on('second-instance', (_e, argv) => {
   if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
@@ -170,6 +202,7 @@ app.on('second-instance', (_e, argv) => {
 });
 
 app.whenReady().then(async () => {
+  setupLogFile();
   Menu.setApplicationMenu(null);
   if (process.env.HR_FAKE_STEAM) {
     // Development only: simulated Steam for testing two copies against each other (tools/fake-steam.mjs).

@@ -114,6 +114,8 @@ function showLobby() {
   $('hud').classList.add('hidden');
   world.setCameraGoal(world.camera.position, world.camLook, 'lobby');
   $('name-input').value = local.get('hr_name') || String(app.steam?.name || '').slice(0, 16);
+  const notice = session.get('hr_notice');
+  if (notice) { session.del('hr_notice'); $('lobby-error').textContent = notice; }
   const params = new URLSearchParams(location.search);
   const code = (params.get('room') || '').toUpperCase();
   if (code) {
@@ -758,11 +760,12 @@ if (desktop) {
     if (!VIA_STEAM) return;
     session.del('hr_room');
     if (app.code) {
-      showBanner('Table closed', 'The host left the game or lost their connection.');
+      showBanner('Table closed', 'Lost the connection to the host — they left, or the network dropped.');
+      session.set('hr_notice', 'Lost the connection to the host \u2014 they left the game, or the network dropped.');
       setTimeout(() => leaveToLobby(), 3500);
     } else {
-      $('lobby-error').textContent = 'The host left the game.';
-      setTimeout(() => { location.href = location.pathname; }, 2500);
+      session.set('hr_notice', 'Couldn\u2019t reach the host through Steam. They may have left, or a network is blocking the connection. \u201cOpen log file\u201d below has the details.');
+      location.href = location.pathname;
     }
   });
   desktop.onNotice((msg) => {
@@ -863,4 +866,7 @@ if (desktop) {
   $('steam-help-copy').addEventListener('click', () => $('copy-link').click());
 
   $('fullscreen-btn').addEventListener('click', (e) => { e.stopImmediatePropagation(); desktop.toggleFullscreen(); }, true);
+  if (desktop.openLog) {
+    for (const id of ['log-btn', 'lobby-log-btn']) { $(id).classList.remove('hidden'); $(id).addEventListener('click', () => desktop.openLog()); }
+  }
 }

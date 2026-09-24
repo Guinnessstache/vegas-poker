@@ -11,7 +11,7 @@ import net from 'node:net';
 const T = { OPEN: 1, DATA_TO_HOST: 2, DATA_TO_GUEST: 3, CLOSE_TO_HOST: 4, CLOSE_TO_GUEST: 5, PING: 6, PONG: 7 };
 const CHUNK = 32 * 1024;
 const PING_EVERY = 2000;
-const HOST_TIMEOUT = 10000; // guest gives up on a silent host
+const HOST_TIMEOUT = 20000; // guest gives up on a host it hasn't heard from at all
 const GUEST_TIMEOUT = 30000; // host drops a silent guest's connections
 const MAX_QUEUE = 8 * 1024 * 1024;
 
@@ -87,6 +87,7 @@ export class Tunnel {
   // ---------- receiving ----------
   handlePacket(peer, buf) {
     if (!buf || buf.length < 5) return;
+    if (this.client?.peer === peer) this.client.lastPong = Date.now(); // anything from the host proves it's alive
     const type = buf.readUInt8(0);
     const id = buf.readUInt32BE(1);
     const payload = buf.subarray(5);
@@ -137,11 +138,12 @@ export class Tunnel {
       if (this.conns.get(key) !== entry) return; // closed while waiting
     }
     if (!ok) {
-      this.log('[tunnel] refused connection from', peer);
+      this.log('[tunnel] refused connection from', peer, '(not in our lobby)');
       this.conns.delete(key);
       this.out(peer, T.CLOSE_TO_GUEST, id);
       return;
     }
+    if (!this.seenOpen?.has(peer)) { (this.seenOpen ||= new Set()).add(peer); this.log('[tunnel] guest connected', peer); }
     const sock = net.connect(this.localPort, '127.0.0.1');
     sock.setNoDelay(true);
     entry.sock = sock;
