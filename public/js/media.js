@@ -2,7 +2,8 @@
 // either side can add media at any time. Signaling goes through the game socket.
 
 export class MediaManager {
-  constructor(socket, { onRemoteVideo, onRemoteGone, onLevel, onLocalStream }) {
+  constructor(socket, opts = {}) {
+    const { onRemoteVideo, onRemoteGone, onLevel, onLocalStream } = opts;
     this.socket = socket;
     this.myPid = null;
     this.peers = new Map(); // pid -> { pc, polite, makingOffer, ignoreOffer, stream, video, analyser }
@@ -18,7 +19,7 @@ export class MediaManager {
     this.videoHost = document.createElement('div');
     this.videoHost.className = 'video-host';
     document.body.appendChild(this.videoHost);
-    fetch('/api/ice').then((r) => r.json()).then((j) => { if (j.iceServers) this.iceServers = j.iceServers; }).catch(() => {});
+    fetch(opts.iceUrl || '/api/ice').then((r) => r.json()).then((j) => { if (j.iceServers) this.iceServers = j.iceServers; }).catch(() => {});
 
     socket.on('rtc', ({ from, data }) => this.onSignal(from, data));
     socket.on('peerLeft', ({ pid }) => this.closePeer(pid));

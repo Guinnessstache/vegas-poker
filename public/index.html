@@ -6,9 +6,13 @@
   <title>High Roller Hold'em</title>
   <meta name="description" content="3D multiplayer No-Limit Texas Hold'em in a Vegas casino. Invite friends with a table code." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠</text></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Self-hosted fonts (OFL) so the desktop/Steam build works offline -->
+  <link rel="stylesheet" href="/vendor/fontsource/cinzel/600.css" />
+  <link rel="stylesheet" href="/vendor/fontsource/cinzel/800.css" />
+  <link rel="stylesheet" href="/vendor/fontsource/inter/400.css" />
+  <link rel="stylesheet" href="/vendor/fontsource/inter/500.css" />
+  <link rel="stylesheet" href="/vendor/fontsource/inter/600.css" />
+  <link rel="stylesheet" href="/vendor/fontsource/inter/700.css" />
   <link rel="stylesheet" href="/css/style.css" />
   <script type="importmap">
     {
@@ -81,6 +85,7 @@
           <p class="hint">Got an invite link? It fills the code in for you.</p>
         </div>
       </div>
+      <div id="server-status" class="server-status connecting" role="status" aria-live="polite"><span class="dot"></span><span class="ss-text">Connecting to the game server…</span></div>
       <p id="lobby-error" class="error"></p>
     </div>
   </section>
@@ -91,6 +96,7 @@
       <div class="room-badge" title="Share this code with friends">
         <span class="lbl">Table</span><span id="room-code">-----</span>
         <button id="copy-link" class="btn small">Copy<span class="lbl-long"> invite</span></button>
+        <button id="steam-invite" class="btn small gold hidden" title="Invite Steam friends">Invite<span class="lbl-long"> Steam friends</span></button>
       </div>
       <div id="status-line" class="status-line"></div>
       <div id="host-controls" class="host-controls hidden">
@@ -189,6 +195,30 @@
     </div>
   </section>
 
+  <dialog id="steam-help">
+    <form method="dialog">
+      <h3>Invite Steam friends</h3>
+      <p>The Steam invite window lives in the Steam overlay, which Steam only adds to games it launched. Your table's Steam lobby is open, so friends can still get in:</p>
+      <ul class="sh-list">
+        <li><b>From Steam:</b> they right-click you in their Friends list → <em>Join Game</em> (while they have the game open).</li>
+        <li><b>From a browser or the game:</b> send them this link or the table code.</li>
+      </ul>
+      <code class="sh-link"></code>
+      <p class="hint">Testing tip: add <code>HighRoller.exe</code> to Steam as a <em>Non-Steam Game</em> and launch it from your library — then the invite window works.</p>
+      <div class="dlg-btns"><button type="button" id="steam-help-copy" class="btn small">Copy link</button><button value="ok" class="btn gold small">Got it</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="steam-friends">
+    <form method="dialog">
+      <h3>Invite Steam friends</h3>
+      <input id="sf-search" class="sf-search" placeholder="Search friends…" autocomplete="off" />
+      <div id="sf-list" class="sf-list"></div>
+      <p class="hint">Invites arrive in the friend's Steam chat. They click <em>Accept</em> (with the game installed) and land at this table. Friends without Steam can use the invite link.</p>
+      <div class="dlg-btns"><button type="button" id="sf-copy" class="btn small">Copy invite link</button><button value="ok" class="btn gold small">Done</button></div>
+    </form>
+  </dialog>
+
   <dialog id="blinds-dialog">
     <form method="dialog">
       <h3>Change blinds</h3>
@@ -202,6 +232,25 @@
     </form>
   </dialog>
 
+  <script>
+    // If the game fails to start, say so on the loading screen instead of spinning forever.
+    (function () {
+      function fail(msg) {
+        var el = document.getElementById('loading');
+        if (!el || el.classList.contains('fade') || el.dataset.failed) return;
+        el.dataset.failed = '1';
+        el.innerHTML = '<div class="spinner">\u2660</div><div>Something went wrong starting the game.</div>' +
+          '<pre style="max-width:80vw;white-space:pre-wrap;color:#ff9a9a;font-size:12px;text-align:left"></pre>';
+        el.querySelector('pre').textContent = msg;
+      }
+      addEventListener('error', function (e) {
+        var t = e.target && e.target !== window ? (e.target.src || e.target.href || '') : '';
+        fail((e.message || 'Failed to load') + (t ? ' — ' + t : '') + (e.filename ? ' — ' + e.filename + ':' + e.lineno : ''));
+      }, true);
+      addEventListener('unhandledrejection', function (e) { fail(String(e.reason && e.reason.stack || e.reason)); });
+      setTimeout(function () { fail('Still loading after 30 seconds. Try restarting the game.'); }, 30000);
+    })();
+  </script>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>

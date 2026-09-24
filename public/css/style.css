@@ -279,3 +279,35 @@ dialog select { width: 100%; margin-top: 10px; background: #000; border: 1px sol
   .banner { top: 30%; padding: 10px 16px; max-width: calc(100vw - 24px); }
 }
 .menu kbd { font-size: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: auto; color: var(--muted); }
+
+#steam-help { max-width: 460px; line-height: 1.5; font-size: 14px; }
+#steam-help .sh-list { padding-left: 18px; margin: 8px 0; }
+#steam-help .sh-link { display: block; margin: 8px 0; padding: 8px 10px; background: #000; border: 1px solid var(--line); border-radius: 8px; word-break: break-all; color: var(--gold); font-size: 13px; }
+#steam-help code { color: var(--gold); }
+
+/* ---------- server status (lobby) + busy buttons ---------- */
+.server-status { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 14px auto 0; font-size: 13px; color: var(--muted); text-align: center; }
+.server-status .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #888; }
+.server-status.online .dot { background: #3ddc84; box-shadow: 0 0 8px #3ddc84; }
+.server-status.connecting .dot, .server-status.waking .dot { background: #f5c451; animation: ss-pulse 1s ease-in-out infinite; }
+.server-status.waking { color: #f5d98a; }
+.server-status.offline .dot { background: #ff6b6b; }
+.server-status.hidden { display: none; }
+@keyframes ss-pulse { 50% { opacity: .25; } }
+.btn.busy { position: relative; pointer-events: none; opacity: .85; }
+.btn.busy::before { content: ''; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin .7s linear infinite; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Steam friends picker ---------- */
+#steam-friends { width: min(440px, 92vw); font-size: 14px; }
+#steam-friends .sf-search { width: 100%; margin: 12px 0 8px; background: #000; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--ink); }
+.sf-list { max-height: min(52vh, 420px); overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.sf-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.03); }
+.sf-row.offline { opacity: .55; }
+.sf-row canvas, .sf-row .sf-noav { width: 32px; height: 32px; border-radius: 4px; flex: none; background: #222; }
+.sf-row .sf-who { flex: 1; min-width: 0; }
+.sf-row .sf-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.sf-row .sf-status { font-size: 12px; color: var(--muted); }
+.sf-row .sf-status.on { color: #57cbff; }
+.sf-row button.done, .sf-row button.done:disabled { opacity: 1; background: #1f5f35; border-color: #3ddc84; color: #bfffd4; }
+.sf-empty { color: var(--muted); padding: 16px; text-align: center; }

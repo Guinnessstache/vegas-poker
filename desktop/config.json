@@ -1,0 +1,5 @@
+{
+  "steamAppId": 480,
+  "onlineServer": "https://high-roller-holdem.onrender.com",
+  "_comment": "steamAppId 480 is Valve's public test app (Spacewar) for development. Replace it with your real App ID after paying the Steam Direct fee. onlineServer is where online tables are hosted."
+}

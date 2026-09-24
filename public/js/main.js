@@ -24,6 +24,29 @@ if (!clientKey) {
 }
 
 const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
+// ---------------- desktop (Steam) build ----------------
+// In the desktop app, preload.cjs exposes `window.hrDesktop`. The page itself is served
+// from a private localhost server, and tables are played on the online server so that
+// friends anywhere (Steam or browser) can join. `?server=` overrides it ('local' = this PC).
+const desktop = window.hrDesktop || null;
+const urlParams = new URLSearchParams(location.search);
+const serverParam = urlParams.get('server');
+function resolveServer(p) {
+  if (!p) return desktop ? (desktop.onlineServer || desktop.localServer || '') : '';
+  if (p === 'local') return desktop?.localServer || '';
+  return p;
+}
+let SERVER = resolveServer(serverParam).replace(/\/$/, '');
+if (SERVER === location.origin) SERVER = '';
+const isLocalServer = (u) => !u || /\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(u);
+const PUBLIC_BASE = SERVER && !isLocalServer(SERVER) ? SERVER : location.origin;
+const withServer = (qs = '') => {
+  const parts = [];
+  if (serverParam) parts.push(`server=${encodeURIComponent(serverParam)}`);
+  if (qs) parts.push(qs);
+  return parts.length ? `${location.pathname}?${parts.join('&')}` : location.pathname;
+};
 const quality = local.get('hr_quality') || (isMobile ? 'medium' : 'high');
 
 // ---------------- boot ----------------
@@ -51,8 +74,10 @@ view.onTimer = (info) => {
 };
 world.onResize = () => view.applyCamera(); // re-aim when rotating the phone
 
-const socket = io({ transports: ['websocket', 'polling'] });
+const socketOpts = { transports: ['websocket', 'polling'] };
+const socket = SERVER ? io(SERVER, socketOpts) : io(socketOpts);
 const media = new MediaManager(socket, {
+  iceUrl: `${SERVER}/api/ice`,
   onRemoteVideo: (pid, video) => { view.setVideoForPid(pid, video); renderTiles(); },
   onRemoteGone: (pid) => { view.setVideoForPid(pid, null); renderTiles(); },
   onLevel: (pid, level) => {
@@ -84,10 +109,19 @@ function showLobby() {
   const code = (params.get('room') || '').toUpperCase();
   if (code) {
     $('code-input').value = code;
-    // Auto-rejoin after a page refresh.
+    // Auto-rejoin after a page refresh, or auto-join from a Steam invite.
     if (session.get('hr_room') === code && local.get('hr_name')) { joinTable(code); return; }
+    if (params.get('join') === '1') { app.autoJoin = code; tryAutoJoin(); return; }
     ($('name-input').value ? $('join-btn') : $('name-input')).focus();
   } else $('name-input').focus();
+}
+
+function tryAutoJoin() {
+  if (!app.autoJoin || app.code) return;
+  if (!$('name-input').value.trim()) return; // waits for the Steam name (desktop) or the user
+  const code = app.autoJoin;
+  app.autoJoin = null;
+  joinTable(code);
 }
 
 function getName() {
@@ -101,7 +135,7 @@ $('create-btn').addEventListener('click', async () => {
   const name = getName();
   if (!name) return;
   unlockAudio();
-  const res = await emit('create', {
+  const res = await whileBusy($('create-btn'), 'Creating table…', () => emit('create', {
     name, key: clientKey,
     settings: {
       startingStack: Number($('set-stack').value),
@@ -109,10 +143,34 @@ $('create-btn').addEventListener('click', async () => {
       actionTime: Number($('set-timer').value),
       allowRebuy: $('set-rebuy').value === '1',
     },
-  });
+  }));
   if (res.ok) enterGame(res);
   else $('lobby-error').textContent = res.error || 'Could not create table';
 });
+
+// Show a spinner on a lobby button until the server answers. If the server is still
+// waking up, say so on the button so it never looks like nothing happened.
+async function whileBusy(btn, label, fn) {
+  if (btn.classList.contains('busy')) return { ok: false };
+  const original = btn.innerHTML;
+  const setLabel = () => { btn.textContent = socket.connected ? label : 'Waking up server…'; };
+  btn.classList.add('busy');
+  btn.disabled = true;
+  setLabel();
+  const relabel = setInterval(setLabel, 500);
+  $('lobby-error').textContent = '';
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise((r) => setTimeout(() => r({ ok: false, error: 'The game server did not answer. Check your connection and try again.' }), 120000)),
+    ]);
+  } finally {
+    clearInterval(relabel);
+    btn.classList.remove('busy');
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
 
 $('join-btn').addEventListener('click', () => joinTable($('code-input').value));
 $('code-input').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
@@ -125,7 +183,7 @@ async function joinTable(code) {
   code = String(code || '').toUpperCase().trim();
   if (code.length !== 5) { $('lobby-error').textContent = 'Table codes are 5 characters.'; return; }
   unlockAudio();
-  const res = await emit('join', { code, name, key: clientKey });
+  const res = await whileBusy($('join-btn'), 'Joining…', () => emit('join', { code, name, key: clientKey }));
   if (res.ok) enterGame(res);
   else { $('lobby-error').textContent = res.error || 'Could not join'; session.del('hr_room'); }
 }
@@ -135,7 +193,8 @@ function enterGame(res) {
   app.pid = res.pid;
   media.setMyPid(res.pid);
   session.set('hr_room', res.code);
-  history.replaceState(null, '', `?room=${res.code}`);
+  history.replaceState(null, '', withServer(`room=${res.code}`));
+  hostSteamLobby(res.code);
   $('lobby').classList.add('hidden');
   $('lobby-error').textContent = '';
   $('hud').classList.remove('hidden');
@@ -154,6 +213,35 @@ socket.on('connect', () => {
   });
 });
 socket.on('disconnect', () => toast('Connection lost — reconnecting…'));
+
+// Lobby server status. The online server sleeps when idle and can take up to a minute to
+// wake, so show that clearly instead of letting buttons look dead.
+const serverStatus = (() => {
+  const el = $('server-status');
+  const text = el.querySelector('.ss-text');
+  const remote = !!SERVER && !isLocalServer(SERVER);
+  let since = Date.now();
+  let failed = false;
+  const set = (cls, msg) => { el.className = `server-status ${cls}`; text.textContent = msg; };
+  function tick() {
+    if (socket.connected) return set('online', remote ? 'Game server online' : 'Ready');
+    const secs = Math.round((Date.now() - since) / 1000);
+    if (!remote) return set(failed ? 'offline' : 'connecting', failed ? 'Cannot reach the game server.' : 'Starting…');
+    if (secs < 3 && !failed) return set('connecting', 'Connecting to the game server…');
+    if (secs > 150) return set('offline', 'Still can’t reach the game server — check your internet connection.');
+    set('waking', `Waking up the game server… ${secs}s (this can take up to a minute after it’s been idle)`);
+  }
+  setInterval(tick, 1000);
+  tick();
+  return {
+    connected() { failed = false; tick(); },
+    lost() { since = Date.now(); tick(); },
+    error() { failed = true; tick(); },
+  };
+})();
+socket.on('connect_error', () => serverStatus.error());
+socket.on('connect', () => serverStatus.connected());
+socket.on('disconnect', () => serverStatus.lost());
 
 socket.on('room', (room) => {
   app.room = room;
@@ -362,7 +450,8 @@ function leaveToLobby() {
   media.closeAll();
   resetMediaUI();
   sfx.setAmbience(false);
-  history.replaceState(null, '', location.pathname);
+  desktop?.leaveTable();
+  history.replaceState(null, '', withServer());
   location.reload(); // cleanest way to reset the 3D table
 }
 
@@ -374,7 +463,7 @@ $('blinds-btn').addEventListener('click', () => {
 });
 
 $('copy-link').addEventListener('click', async () => {
-  const url = `${location.origin}/?room=${app.code}`;
+  const url = `${PUBLIC_BASE}/?room=${app.code}`;
   try {
     if (navigator.share && isMobile) await navigator.share({ title: "High Roller Hold'em", text: `Join my poker table! Code ${app.code}`, url });
     else { await navigator.clipboard.writeText(url); toast('Invite link copied — send it to your friends!'); }
@@ -587,3 +676,132 @@ function toast(msg, ms = 3200) {
 
 // Expose for debugging in the console.
 window.__poker = { app, world, view, media, socket };
+
+// ---------------- Steam integration (desktop build only) ----------------
+function hostSteamLobby(code) {
+  if (!desktop || !app.steam?.ok) return;
+  if (isLocalServer(SERVER || location.origin)) return; // offline tables can't be joined from outside
+  desktop.hostTable(code, SERVER || location.origin).catch(() => {});
+}
+
+if (desktop) {
+  document.body.classList.add('is-desktop');
+  desktop.steamInfo().then((info) => {
+    app.steam = info;
+    if (!info?.ok) return;
+    if (!$('name-input').value.trim()) $('name-input').value = String(info.name || '').slice(0, 16);
+    $('steam-invite').classList.remove('hidden');
+    if (app.code) hostSteamLobby(app.code);
+    tryAutoJoin();
+  }).catch(() => {});
+
+  // A Steam friend invited us (or we clicked "Join game"): go to their table.
+  desktop.onJoinTable(({ code, server }) => {
+    if (!code) return;
+    const target = String(server || '').replace(/\/$/, '');
+    if (app.code === code && (target || '') === (SERVER || location.origin)) return;
+    if (app.code) socket.emit('leave', {}, () => {});
+    const qs = [];
+    if (target) qs.push(`server=${encodeURIComponent(target)}`);
+    qs.push(`room=${encodeURIComponent(code)}`, 'join=1');
+    session.del('hr_room');
+    location.href = `${location.pathname}?${qs.join('&')}`;
+  });
+
+  $('steam-invite').addEventListener('click', async () => {
+    if (!app.code) return;
+    if (isLocalServer(SERVER || location.origin)) { toast('This is an offline table — switch to online play to invite friends.'); return; }
+    const btn = $('steam-invite');
+    btn.disabled = true;
+    try {
+      const lobby = await desktop.hostTable(app.code, SERVER || location.origin);
+      if (!lobby?.ok) { toast(`Couldn't create the Steam lobby${lobby?.error ? ` (${lobby.error})` : ''}. Is Steam online?`, 6000); return; }
+      const friends = desktop.friends ? await desktop.friends() : null;
+      if (Array.isArray(friends)) { showFriendPicker(friends); return; }
+      // Fallback: Steam's own overlay invite window, or the help dialog.
+      const res = await desktop.invite();
+      if (!res?.overlay) showSteamHelp();
+      else toast('Opened Steam’s invite window. If you don’t see it, use Copy invite instead.', 6000);
+    } catch (e) {
+      toast(`Steam invite failed: ${e?.message || e}`, 6000);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // In-game friends list (doesn't depend on the Steam overlay, which Electron can't show).
+  const invited = new Set();
+  let friendList = [];
+  function avatarCanvas(av) {
+    const c = document.createElement('canvas');
+    if (!av) { const d = document.createElement('div'); d.className = 'sf-noav'; return d; }
+    c.width = av.w; c.height = av.h;
+    const bytes = Uint8ClampedArray.from(atob(av.rgba), (ch) => ch.charCodeAt(0));
+    c.getContext('2d').putImageData(new ImageData(bytes, av.w, av.h), 0, 0);
+    return c;
+  }
+  function renderFriends() {
+    const list = $('sf-list');
+    const q = $('sf-search').value.trim().toLowerCase();
+    list.textContent = '';
+    const shown = friendList.filter((f) => !q || f.name.toLowerCase().includes(q));
+    if (!shown.length) {
+      const e = document.createElement('div');
+      e.className = 'sf-empty';
+      e.textContent = friendList.length ? 'No friends match that search.' : 'Your Steam friends list is empty.';
+      list.append(e);
+      return;
+    }
+    for (const f of shown) {
+      const row = document.createElement('div');
+      row.className = `sf-row${f.state === 0 ? ' offline' : ''}`;
+      const who = document.createElement('div');
+      who.className = 'sf-who';
+      const nm = document.createElement('div'); nm.className = 'sf-name'; nm.textContent = f.name;
+      const st = document.createElement('div'); st.className = `sf-status${f.state ? ' on' : ''}`; st.textContent = f.status;
+      who.append(nm, st);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn small gold';
+      const mark = () => { b.textContent = 'Invited ✓'; b.classList.add('done'); b.disabled = true; };
+      if (invited.has(`${app.code}:${f.id}`)) mark(); else b.textContent = 'Invite';
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        b.textContent = 'Sending…';
+        let ok = false;
+        try {
+          await desktop.hostTable(app.code, SERVER || location.origin);
+          ok = await desktop.inviteFriend(f.id);
+        } catch { ok = false; }
+        if (ok) { invited.add(`${app.code}:${f.id}`); mark(); }
+        else { b.disabled = false; b.textContent = 'Retry'; toast(`Couldn’t invite ${f.name}. Is Steam online?`, 5000); }
+      });
+      row.append(avatarCanvas(f.avatar), who, b);
+      list.append(row);
+    }
+  }
+  function showFriendPicker(friends) {
+    friendList = friends;
+    $('sf-search').value = '';
+    renderFriends();
+    $('steam-friends').showModal();
+    $('sf-search').focus();
+  }
+  $('sf-search').addEventListener('input', renderFriends);
+  $('sf-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+  $('sf-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(`${PUBLIC_BASE}/?room=${app.code}`); toast('Invite link copied'); } catch { /* ignore */ }
+  });
+
+  // The Steam overlay only exists when Steam launched the game. Explain the other ways in.
+  function showSteamHelp() {
+    const d = $('steam-help');
+    d.querySelector('.sh-link').textContent = `${PUBLIC_BASE}/?room=${app.code}`;
+    d.showModal();
+  }
+  $('steam-help-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(`${PUBLIC_BASE}/?room=${app.code}`); toast('Invite link copied'); } catch { /* ignore */ }
+  });
+
+  $('fullscreen-btn').addEventListener('click', (e) => { e.stopImmediatePropagation(); desktop.toggleFullscreen(); }, true);
+}

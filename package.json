@@ -2,26 +2,96 @@
   "name": "vegas-poker",
   "version": "1.0.0",
   "description": "3D multiplayer No-Limit Texas Hold'em in the browser with a casino setting, room codes, and webcam/mic at the table.",
-  "main": "server/index.js",
+  "main": "desktop/main.mjs",
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test",
-    "docs:sync": "node scripts/sync-docs.mjs"
+    "docs:sync": "node scripts/sync-docs.mjs",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win dir",
+    "dist:linux": "electron-builder --linux dir"
   },
   "engines": {
     "node": ">=18"
   },
   "license": "MIT",
   "dependencies": {
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
     "express": "^4.21.2",
+    "koffi": "^3.3.1",
     "socket.io": "^4.8.1",
+    "steamworks.js": "^0.4.0",
     "three": "^0.186.0"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/Guinnessstache/vegas-poker.git"
   },
-  "homepage": "https://guinnessstache.github.io/vegas-poker/"
+  "homepage": "https://guinnessstache.github.io/vegas-poker/",
+  "productName": "High Roller Hold'em",
+  "author": "GuinnessStache",
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.guinnessstache.highroller",
+    "productName": "High Roller Hold'em",
+    "executableName": "HighRoller",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "desktop/**",
+      "server/**",
+      "public/**",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asarUnpack": [
+      "node_modules/steamworks.js/**",
+      "node_modules/koffi/**",
+      "node_modules/@koromix/**"
+    ],
+    "win": {
+      "target": [
+        "dir"
+      ],
+      "icon": "build/icon.png",
+      "extraFiles": [
+        {
+          "from": "node_modules/steamworks.js/dist/win64/steam_api64.dll",
+          "to": "steam_api64.dll"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "icon": "build/icon.png",
+      "category": "Game",
+      "extraFiles": [
+        {
+          "from": "node_modules/steamworks.js/dist/linux64/libsteam_api.so",
+          "to": "libsteam_api.so"
+        }
+      ]
+    },
+    "extraResources": [
+      {
+        "from": "node_modules/three",
+        "to": "three",
+        "filter": [
+          "package.json",
+          "build/**",
+          "examples/jsm/**"
+        ]
+      }
+    ]
+  }
 }
