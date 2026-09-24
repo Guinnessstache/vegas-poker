@@ -38,7 +38,7 @@ export class MediaManager {
 
   // Keep a connection with every other connected member.
   syncMembers(members) {
-    const want = new Set(members.filter((m) => m.connected && m.pid !== this.myPid).map((m) => m.pid));
+    const want = new Set(members.filter((m) => m.connected && !m.bot && m.pid !== this.myPid).map((m) => m.pid));
     for (const pid of want) if (!this.peers.has(pid)) this.createPeer(pid);
     for (const pid of [...this.peers.keys()]) if (!want.has(pid)) this.closePeer(pid);
   }

@@ -313,3 +313,20 @@ dialog select { width: 100%; margin-top: 10px; background: #000; border: 1px sol
 .sf-empty { color: var(--muted); padding: 16px; text-align: center; }
 
 .lobby-foot { text-align: center; margin: 6px 0 0; }
+
+/* ---------- bots ---------- */
+.solo-row { display: flex; gap: 8px; margin-top: 10px; align-items: stretch; }
+.solo-row .btn.big { flex: 1; margin-top: 0; padding: 11px; font-size: 15px; }
+.solo-row select { flex: none; background: rgba(0, 0, 0, 0.45); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; color: var(--ink); }
+#bots-dialog { width: min(460px, 92vw); font-size: 14px; }
+.bd-section { margin-top: 14px; }
+.bd-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+.bd-row { display: flex; gap: 8px; align-items: center; }
+.bd-row select { flex: 1; margin-top: 0; }
+.bd-row #bot-fill-level { flex: 0 0 auto; width: auto; }
+.bot-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+.bot-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.04); }
+.bot-row .br-name { flex: 1; font-weight: 600; }
+.bot-row .br-level { font-size: 12px; color: var(--muted); }
+.bot-row .br-auto { font-size: 11px; color: var(--gold); }
+.bot-empty { color: var(--muted); padding: 8px; }

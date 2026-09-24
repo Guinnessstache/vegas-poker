@@ -317,6 +317,7 @@ export class GameView {
       if (t.button === i && t.street !== 'idle') tags.push('D');
       if (s.sittingOut) tags.push('AWAY');
       if (m && !m.connected) tags.push('OFFLINE');
+      if (m && m.bot) tags.push('BOT');
       L.tag.textContent = tags.join(' · ');
       L.el.classList.toggle('folded', !!s.folded);
       L.el.classList.toggle('acting', t.toAct === i);

@@ -75,6 +75,14 @@
             </label>
           </div>
           <button id="create-btn" class="btn gold big">Create table</button>
+          <div class="solo-row">
+            <button id="solo-btn" class="btn ghost big" type="button">Play vs bots</button>
+            <select id="solo-level" aria-label="Bot difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
         </div>
         <div class="panel">
           <h2>Join friends</h2>
@@ -104,6 +112,7 @@
         <button id="start-btn" class="btn gold">Deal cards</button>
         <button id="pause-btn" class="btn small ghost hidden">Pause<span class="lbl-long"> after hand</span></button>
         <button id="blinds-btn" class="btn small ghost">Blinds…</button>
+        <button id="bots-btn" class="btn small ghost">Bots…</button>
       </div>
     </div>
 
@@ -217,6 +226,35 @@
       <div id="sf-list" class="sf-list"></div>
       <p class="hint">Invites arrive in the friend&rsquo;s Steam chat. They click <em>Accept</em> (with the game installed) and land at this table. Or share the table code &mdash; they enter it under <em>Join table</em>.</p>
       <div class="dlg-btns"><button type="button" id="sf-copy" class="btn small">Copy table code</button><button value="ok" class="btn gold small">Done</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="bots-dialog">
+    <form method="dialog">
+      <h3>Computer players</h3>
+      <div class="bd-section">
+        <div class="bd-label">Add a bot</div>
+        <div class="bd-row">
+          <select id="bot-add-level"><option value="easy">Easy — loose, calls a lot</option><option value="medium" selected>Medium — solid, tight-aggressive</option><option value="hard">Hard — reads the table, bluffs</option></select>
+          <button type="button" id="bot-add" class="btn gold small">Add</button>
+        </div>
+      </div>
+      <div class="bd-section">
+        <div class="bd-label">At the table</div>
+        <div id="bot-list" class="bot-list"></div>
+      </div>
+      <div class="bd-section">
+        <div class="bd-label">Keep the table full</div>
+        <div class="bd-row">
+          <select id="bot-fill">
+            <option value="0">Off</option><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option>
+            <option value="5">5 players</option><option value="6">6 players</option><option value="7">7 players</option><option value="8">8 players</option>
+          </select>
+          <select id="bot-fill-level"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select>
+        </div>
+        <p class="hint">Bots fill empty seats up to this many players and step aside when friends join.</p>
+      </div>
+      <div class="dlg-btns"><button value="ok" class="btn gold small">Done</button></div>
     </form>
   </dialog>
 

@@ -95,6 +95,9 @@ export function createGameServer() {
     socket.on('rebuy', guard(() => room.rebuy(member)));
     socket.on('sitout', guard((d) => room.setSittingOut(member, d?.value)));
     socket.on('settings', guard((d) => room.updateSettings(member, d || {})));
+    socket.on('addBot', guard((d) => room.hostAddBot(member, String(d?.level || 'medium'))));
+    socket.on('removeBot', guard((d) => room.hostRemoveBot(member, String(d?.pid || ''))));
+    socket.on('botFill', guard((d) => room.hostBotFill(member, Number(d?.count) || 0, String(d?.level || 'medium'))));
     socket.on('chat', guard((d) => room.userChat(member, d?.text)));
     socket.on('media', guard((d) => room.setMedia(member, d)));
     socket.on('rtc', guard((d) => room.relaySignal(member, d?.to, d?.data)));

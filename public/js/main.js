@@ -183,6 +183,29 @@ async function whileBusy(btn, label, fn) {
   }
 }
 
+// Single player: an instant table filled with bots, dealt right away.
+$('solo-btn').addEventListener('click', async () => {
+  const name = getName();
+  if (!name) return;
+  unlockAudio();
+  const res = await whileBusy($('solo-btn'), 'Dealing you in…', () => emit('create', {
+    name, key: clientKey,
+    settings: {
+      startingStack: Number($('set-stack').value),
+      bigBlind: Number($('set-blinds').value),
+      actionTime: Number($('set-timer').value),
+      allowRebuy: $('set-rebuy').value === '1',
+      fillBots: 6,
+      botLevel: $('solo-level').value,
+    },
+  }));
+  if (!res.ok) { $('lobby-error').textContent = res.error || 'Could not start a game'; return; }
+  local.set('hr_solo_level', $('solo-level').value);
+  enterGame(res);
+  emit('start');
+});
+if (local.get('hr_solo_level')) $('solo-level').value = local.get('hr_solo_level');
+
 $('join-btn').addEventListener('click', () => joinTable($('code-input').value));
 $('code-input').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
 $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinTable(e.target.value); });
@@ -287,6 +310,7 @@ socket.on('room', (room) => {
   app.room = room;
   view.setRoom(room, app.pid);
   media.syncMembers(room.members);
+  if ($('bots-dialog').open) renderBotsDialog();
   view.rebindVideos(media.videoMap());
   updateHUD();
   renderTiles();
@@ -350,7 +374,7 @@ function updateHUD() {
   const seated = t.seats.filter(Boolean).length;
   let status = '';
   if (you.seat < 0) status = '👀 Spectating — click “Sit here” on an empty seat to play';
-  else if (!room.running) status = you.isHost ? (seated < 2 ? 'Share the code — waiting for at least one friend' : 'Ready when you are — hit “Deal cards”') : 'Waiting for the host to deal';
+  else if (!room.running) status = you.isHost ? (seated < 2 ? 'Share the code, or add bots (Bots…) to play now' : 'Ready when you are — hit “Deal cards”') : 'Waiting for the host to deal';
   else if (t.street === 'idle') status = seated < 2 ? 'Waiting for more players…' : 'Shuffling up…';
   else status = `Hand #${t.handNumber} · Blinds ${fmt(t.sb)}/${fmt(t.bb)} · ${t.street === 'preflop' ? 'Pre-flop' : t.street[0].toUpperCase() + t.street.slice(1)}`;
   $('status-line').textContent = status;
@@ -495,6 +519,46 @@ function leaveToLobby() {
   history.replaceState(null, '', withServer());
   location.reload(); // cleanest way to reset the 3D table
 }
+
+// ---------------- bots (host) ----------------
+const LEVEL_NAME = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+function renderBotsDialog() {
+  const room = app.room;
+  if (!room) return;
+  const list = $('bot-list');
+  list.textContent = '';
+  const bots = room.members.filter((m) => m.bot);
+  if (!bots.length) {
+    const e = document.createElement('div');
+    e.className = 'bot-empty';
+    e.textContent = 'No bots yet.';
+    list.append(e);
+  }
+  for (const b of bots) {
+    const row = document.createElement('div');
+    row.className = 'bot-row';
+    const nm = document.createElement('span'); nm.className = 'br-name'; nm.textContent = `\u{1F916} ${b.name}`;
+    const lv = document.createElement('span'); lv.className = 'br-level'; lv.textContent = LEVEL_NAME[b.bot] || b.bot;
+    row.append(nm, lv);
+    if (b.botAuto) { const a = document.createElement('span'); a.className = 'br-auto'; a.textContent = 'auto'; row.append(a); }
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.className = 'btn small ghost'; rm.textContent = 'Remove';
+    rm.addEventListener('click', () => emit('removeBot', { pid: b.pid }));
+    row.append(rm);
+    list.append(row);
+  }
+  const fill = room.settings.fillBots || 0;
+  $('bot-fill').value = String(fill);
+  $('bot-fill-level').value = room.settings.botLevel || 'medium';
+  $('bot-fill-level').disabled = !fill;
+  const seated = app.state ? app.state.table.seats.filter(Boolean).length : 0;
+  $('bot-add').disabled = seated >= 8;
+}
+$('bots-btn').addEventListener('click', () => { renderBotsDialog(); $('bots-dialog').showModal(); });
+$('bot-add').addEventListener('click', () => emit('addBot', { level: $('bot-add-level').value }));
+const sendFill = () => emit('botFill', { count: Number($('bot-fill').value), level: $('bot-fill-level').value });
+$('bot-fill').addEventListener('change', sendFill);
+$('bot-fill-level').addEventListener('change', sendFill);
 
 $('blinds-btn').addEventListener('click', () => {
   const d = $('blinds-dialog');
