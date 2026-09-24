@@ -38,6 +38,7 @@ function loadFlatApi() {
       imageSize: lib.func('bool SteamAPI_ISteamUtils_GetImageSize(void *self, int image, _Out_ uint32_t *w, _Out_ uint32_t *h)'),
       imageRGBA: lib.func('bool SteamAPI_ISteamUtils_GetImageRGBA(void *self, int image, _Out_ uint8_t *buf, int size)'),
       inviteToLobby: lib.func('bool SteamAPI_ISteamMatchmaking_InviteUserToLobby(void *self, uint64_t lobby, uint64_t invitee)'),
+      floatingKeyboard: lib.func('bool SteamAPI_ISteamUtils_ShowFloatingGamepadTextInput(void *self, int mode, int x, int y, int w, int h)'),
       lobbyStringFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListStringFilter(void *self, const char *key, const char *value, int cmp)'),
       lobbyDistanceFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListDistanceFilter(void *self, int filter)'),
       lobbyCountFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListResultCountFilter(void *self, int max)'),
@@ -219,6 +220,16 @@ export class Steam {
     const hostHere = this.lobby.getMembers().some((m) => String(m.steamId64) === host);
     if (data.code) this.setPresence(data.code);
     return { code: data.code || null, host, hostHere, game: data.game || null };
+  }
+
+  // Steam's on-screen keyboard (Steam Deck / Big Picture). Returns false where it isn't available.
+  showKeyboard({ x = 0, y = 0, w = 0, h = 0, dpr = 1 } = {}) {
+    const f = this.flatApi();
+    if (!f?.floatingKeyboard) return false;
+    try {
+      const px = (v) => Math.round(v * dpr);
+      return !!f.floatingKeyboard(f.utils(), 0 /* single line */, px(x), px(y), px(w), px(h));
+    } catch { return false; }
   }
 
   isHosting() {

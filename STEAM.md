@@ -46,6 +46,17 @@ Alice creates a table; Bob joins with the code or gets invited from Alice's frie
 
 Keys: **F11** fullscreen, **Ctrl+Shift+I** dev tools.
 
+## Controller / Steam Deck
+
+The game reads controllers directly (Xbox, PlayStation, Switch Pro, Steam Deck), so in
+Steamworks → Application → **Steam Input**, pick **"Use the default Gamepad configuration"**
+(a plain Xbox-style layout); don't force a keyboard/mouse template. On a Steam Deck the game
+starts full screen with the interface at 115%, and text fields open Steam's own keyboard.
+
+For **Steam Deck Verified**: controller works everywhere (yes), readable at 1280×800 (yes, and
+Interface size can go to 150%), on-screen keyboard for text (yes), no launcher (yes). Request a
+review in Steamworks once the game is released.
+
 ## Build the Windows folder you upload to Steam
 
 ```powershell

@@ -25,6 +25,7 @@ The seated first-person view, the dealer and the casino floor take their cue fro
 - **Table talk.** Chat, emoji reactions that float over your seat, and synthesized sound effects plus casino background noise (all Web Audio).
 - **Quality of life.** Turn timer (players who time out get sat out), Check/Fold and Call-any pre-actions, bet presets (½ pot, ¾ pot, pot, all-in), a "your hand" hint, rebuy/top-up, sit out, host blind changes, reconnect on refresh, and automatic resolution scaling on slower GPUs.
 - **Keyboard:** `F` fold · `C` check/call · `R` raise · `V` change camera · `Enter` chat.
+- **Controller:** Xbox, PlayStation, Switch Pro and Steam Deck. Ⓐ check/call · hold Ⓧ fold · Ⓨ bet/raise · LB/RB bet size · LT ½ pot · RT pot (twice for all-in) · D-pad moves through every menu · Ⓑ back · ☰ settings · ⧉ camera · right stick looks around. Button hints switch to your controller's symbols, text fields get an on-screen keyboard, and Settings → Interface size scales the UI up for handhelds and TVs.
 
 ## Run it on your PC
 

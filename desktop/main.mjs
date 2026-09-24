@@ -193,6 +193,7 @@ ipcMain.handle('hr:achievement', (_e, name) => steam?.unlock(String(name)) ?? fa
 ipcMain.handle('hr:overlay', (_e, dialog) => { steam?.openOverlay(dialog); return true; });
 ipcMain.handle('hr:fullscreen', (_e, on) => { win?.setFullScreen(on == null ? !win.isFullScreen() : !!on); return win?.isFullScreen(); });
 ipcMain.handle('hr:quit', () => app.quit());
+ipcMain.handle('hr:keyboard', (_e, rect) => steam?.showKeyboard?.(rect) ?? false);
 ipcMain.handle('hr:open-log', () => { if (LOG_FILE) shell.showItemInFolder(LOG_FILE); return LOG_FILE; });
 
 app.on('second-instance', (_e, argv) => {

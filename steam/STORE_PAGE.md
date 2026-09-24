@@ -42,6 +42,8 @@ High Roller Hold'em puts you and your friends around a felt table in a high-end 
 - Cards fly from the dealer, chips slide into the pot, the winning hand lights up.
 - Seated, overhead and free-camera views; a lively casino floor with slot machines, a bar and the hum of the room.
 
+**Couch and handheld ready** — full controller support (Xbox, PlayStation, Switch Pro, Steam Deck) with an on-screen keyboard and a scalable interface for your TV.
+
 **20 Steam achievements** — from your first pot to a royal flush, knocking out a Hard bot, or winning with 7-2.
 
 *No real money. Chips have no cash value and can't be bought.*
@@ -58,6 +60,10 @@ Poker · Card Game · Casino · Multiplayer · Online PvP · Singleplayer · Cas
 - **Voice/video chat:** players can share webcam and microphone with the people at their table (off by default; peer-to-peer). Steam may ask how players can mute/stop it: each player can mute, turn off their camera, or stop sharing at any time, and nothing is shared until they click "Join with camera & mic".
 - **Text chat:** yes, table chat.
 - No violence, sexual content or drugs.
+
+## Features to tick in Steamworks
+
+Single-player · Online PvP · Steam Achievements · **Full Controller Support**. (Leave Remote Play Together off unless you test it first.)
 
 ## Supported languages
 

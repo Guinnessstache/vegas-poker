@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('hrDesktop', {
   toggleFullscreen: (on) => ipcRenderer.invoke('hr:fullscreen', on),
   quit: () => ipcRenderer.invoke('hr:quit'),
   openLog: () => ipcRenderer.invoke('hr:open-log'),
+  showKeyboard: (rect) => ipcRenderer.invoke('hr:keyboard', rect),
   onJoinTable: (cb) => ipcRenderer.on('hr:join-table', (_e, target) => cb(target)),
   onHostLost: (cb) => ipcRenderer.on('hr:host-lost', () => cb()),
   onNotice: (cb) => ipcRenderer.on('hr:notice', (_e, msg) => cb(msg)),

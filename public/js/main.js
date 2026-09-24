@@ -6,6 +6,8 @@ import { MediaManager } from './media.js';
 import { Sound } from './sound.js';
 import { evaluate } from '/shared/handEval.js';
 import { ACHIEVEMENTS, ACHIEVEMENT_BY_ID } from './achievements.js';
+import { PadInput, GLYPHS } from './gamepad.js';
+import { PadNav, OnScreenKeyboard } from './padnav.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n || 0).toLocaleString();
@@ -335,6 +337,7 @@ socket.on('state', (s) => {
   }
   if (!wasMyTurn && s.you.legal) {
     sfx.play('turn');
+    if (padStyle) pad.rumble(140, 0.4, 0.25);
     if (tryPreAction(s.you.legal)) return;
   }
   updateHUD();
@@ -402,10 +405,11 @@ function updateHUD() {
   bar.classList.toggle('hidden', !me);
   bar.classList.toggle('disabled', !legal);
   bar.classList.toggle('my-turn', !!legal);
+  document.body.classList.toggle('my-turn', !!legal);
   const canPre = me && me.inHand && !me.folded && !me.allIn && t.street !== 'idle' && !t.handOver;
   $('action-bar').querySelector('.pre-row').style.visibility = canPre ? 'visible' : 'hidden';
   if (legal) {
-    $('call-btn').innerHTML = legal.canCheck ? 'Check <kbd>C</kbd>' : `Call ${fmt(legal.toCall)}${legal.toCall >= me.stack ? ' (All-in)' : ''} <kbd>C</kbd>`;
+    $('call-btn').innerHTML = legal.canCheck ? `Check ${keyHint('call')}` : `Call ${fmt(legal.toCall)}${legal.toCall >= me.stack ? ' (All-in)' : ''} ${keyHint('call')}`;
     const slider = $('raise-slider');
     slider.min = legal.minRaiseTo;
     slider.max = legal.maxRaiseTo;
@@ -437,7 +441,7 @@ function updateRaiseLabel() {
   if (!legal) return;
   const v = Number($('raise-input').value);
   const allIn = v >= legal.maxRaiseTo;
-  $('raise-btn').innerHTML = !legal.canRaise ? 'Raise' : allIn ? `All-in ${fmt(v)} <kbd>R</kbd>` : `${legal.isBet ? 'Bet' : 'Raise to'} ${fmt(v)} <kbd>R</kbd>`;
+  $('raise-btn').innerHTML = !legal.canRaise ? 'Raise' : allIn ? `All-in ${fmt(v)} ${keyHint('raise')}` : `${legal.isBet ? 'Bet' : 'Raise to'} ${fmt(v)} ${keyHint('raise')}`;
 }
 
 $('raise-slider').addEventListener('input', (e) => { app.raiseTouched = true; setRaise(e.target.value); });
@@ -863,6 +867,156 @@ for (const id of ['ach-btn', 'lobby-ach-btn']) {
   $(id).addEventListener('click', () => { $('menu')?.classList.add('hidden'); renderAchievements(); $('ach-dialog').showModal(); });
 }
 
+// ---------------- controller (gamepad) ----------------
+// A call/check · hold X fold · Y bet/raise · LB/RB bet size · LT ½ pot · RT pot (twice = all-in)
+// D-pad / left stick: move between buttons · B back · ☰ menu · ⧉ camera · right stick: look around
+let padStyle = null; // 'xbox' | 'ps' | 'nintendo' while a controller is in use
+const nav = new PadNav();
+const osk = new OnScreenKeyboard();
+const glyph = (b) => GLYPHS[padStyle || 'xbox'][b];
+function keyHint(key) {
+  if (padStyle) { const b = { fold: 'x', call: 'a', raise: 'y' }[key]; return `<kbd class="pad-glyph g-${b}">${glyph(b)}</kbd>`; }
+  return `<kbd>${{ fold: 'F', call: 'C', raise: 'R' }[key]}</kbd>`;
+}
+function refreshHints() {
+  $('fold-btn').innerHTML = `Fold ${padStyle ? `<kbd class="pad-glyph g-x">${glyph('x')}</kbd>` : '<kbd>F</kbd>'}`;
+  const g = (b) => `<kbd class="pad-glyph g-${b}">${glyph(b)}</kbd>`;
+  $('pad-hints').innerHTML = padStyle ? [
+    [g('a'), 'Call'], [g('x'), 'Hold to fold'], [g('y'), 'Bet'], [g('lb') + g('rb'), 'Size'], [g('lt'), '½ pot'], [g('rt'), 'Pot'],
+  ].map(([k, t]) => `<span>${k}${t}</span>`).join('') : '';
+  if (app.state) updateHUD();
+}
+
+function padLayer() {
+  if (osk.open) return { type: 'osk' };
+  const dlg = [...document.querySelectorAll('dialog[open]')].pop();
+  if (dlg) return { type: 'dialog', root: dlg };
+  if (!$('hud').classList.contains('hidden') && !$('menu').classList.contains('hidden')) return { type: 'menu', root: $('menu') };
+  if (!$('lobby').classList.contains('hidden')) return { type: 'lobby', root: $('lobby') };
+  if (!$('hud').classList.contains('hidden')) return { type: 'table', root: $('hud') };
+  return null;
+}
+
+function openKeyboard(input) {
+  const after = {
+    'chat-input': () => { $('chat-form').requestSubmit(); nav.clear(); },
+    'code-input': () => nav.focus($('join-btn')),
+    'name-input': () => nav.focus($('create-btn')),
+  }[input.id];
+  // On Steam Deck / Big Picture, Steam's own keyboard pops up over the field.
+  const r = input.getBoundingClientRect();
+  const steamKb = desktop?.showKeyboard?.({ x: r.left, y: r.top, w: r.width, h: r.height, dpr: devicePixelRatio });
+  Promise.resolve(steamKb).then((shown) => {
+    if (shown) { input.focus(); return; }
+    osk.show(input, { glyphs: GLYPHS[padStyle || 'xbox'], label: input.closest('label')?.querySelector('span')?.textContent || input.placeholder, onDone: after });
+  });
+}
+
+// Pick the control nearest the bottom-middle of the screen when first entering the HUD.
+function hudEntry() {
+  const items = nav.items($('hud'));
+  let best = null; let bd = Infinity;
+  for (const el of items) {
+    const r = el.getBoundingClientRect();
+    const d = Math.hypot(r.left + r.width / 2 - innerWidth / 2, r.top + r.height / 2 - innerHeight * 0.8);
+    if (d < bd) { bd = d; best = el; }
+  }
+  nav.focus(best);
+}
+
+let foldTimer = null;
+let lastRt = 0;
+let lbrbRepeats = 0;
+function nudgeRaise(dir, repeat) {
+  const l = app.state?.you.legal;
+  if (!l?.canRaise) return;
+  lbrbRepeats = repeat ? lbrbRepeats + 1 : 0;
+  const bb = app.state.table.bb;
+  const step = bb * (lbrbRepeats > 12 ? 10 : lbrbRepeats > 5 ? 4 : 1);
+  app.raiseTouched = true;
+  setRaise(Number($('raise-input').value) + dir * step);
+}
+
+const pad = new PadInput({
+  onActive(style) {
+    padStyle = style;
+    document.body.classList.toggle('pad', !!style);
+    if (style) document.body.dataset.pad = style; else delete document.body.dataset.pad;
+    if (!style) nav.clear();
+    refreshHints();
+  },
+  onLook(x, y) {
+    if (!padStyle) return;
+    world.mouse.set(x, -y);
+  },
+  onRelease(name) {
+    if (name === 'x' && foldTimer) { clearTimeout(foldTimer); foldTimer = null; $('fold-btn').classList.remove('holding'); }
+  },
+  onPress(name, { repeat }) {
+    const L = padLayer();
+    if (!L) return;
+    const dir = ['up', 'down', 'left', 'right'].includes(name) ? name : null;
+    if (L.type === 'osk') { osk.handle(name); return; }
+
+    if (L.type !== 'table') {
+      if (dir) nav.move(L.root, dir);
+      else if (name === 'a') { nav.ensure(L.root); nav.activate(openKeyboard); }
+      else if (name === 'b' || (name === 'menu' && L.type === 'menu')) {
+        if (L.type === 'dialog') L.root.close();
+        else if (L.type === 'menu') $('menu').classList.add('hidden');
+        nav.clear();
+      } else if (name === 'menu' && L.type === 'lobby') { nav.focus($('solo-btn')); }
+      return;
+    }
+
+    // At the table.
+    const legal = app.state?.you.legal;
+    const focused = nav.current && $('hud').contains(nav.current) && nav.current.isConnected;
+    if (dir) { if (!focused) hudEntry(); else nav.move(L.root, dir); return; }
+    switch (name) {
+      case 'a':
+        if (focused) nav.activate(openKeyboard);
+        else if (legal) $('call-btn').click();
+        else if (!$('start-btn').classList.contains('hidden') && !$('host-controls').classList.contains('hidden')) $('start-btn').click();
+        break;
+      case 'b': nav.clear(); break;
+      case 'x':
+        if (!legal) break;
+        $('fold-btn').classList.add('holding');
+        clearTimeout(foldTimer);
+        foldTimer = setTimeout(() => {
+          foldTimer = null;
+          $('fold-btn').classList.remove('holding');
+          if (pad.isDown('x') && app.state?.you.legal) { pad.rumble(80, 0.2, 0.2); act('fold'); }
+        }, 450);
+        break;
+      case 'y': if (legal?.canRaise) $('raise-btn').click(); break;
+      case 'lb': nudgeRaise(-1, repeat); break;
+      case 'rb': nudgeRaise(1, repeat); break;
+      case 'lt': if (legal?.canRaise) document.querySelector('[data-preset="half"]').click(); break;
+      case 'rt': {
+        if (!legal?.canRaise) break;
+        const now = performance.now();
+        document.querySelector(`[data-preset="${now - lastRt < 400 ? 'allin' : 'pot'}"]`).click();
+        lastRt = now;
+        break;
+      }
+      case 'view': $('cam-cycle').click(); break;
+      case 'menu': $('menu').classList.remove('hidden'); nav.focus(null); nav.ensure($('menu')); break;
+      case 'rs': $('boardhud-toggle').click(); toast(`Board cards on screen: ${app.boardHud ? 'on' : 'off'}`); break;
+      default: break;
+    }
+  },
+});
+
+// Interface size (bigger for Steam Deck / TV).
+function applyUiScale(v) {
+  document.documentElement.style.setProperty('--ui-zoom', String(v));
+  $('uiscale-select').value = String(v);
+}
+$('uiscale-select').addEventListener('change', (e) => { local.set('hr_uiscale', e.target.value); applyUiScale(Number(e.target.value)); });
+applyUiScale(Number(local.get('hr_uiscale')) || 1);
+
 // Expose for debugging in the console.
 window.__poker = { app, world, view, media, socket };
 
@@ -887,6 +1041,11 @@ if (desktop) {
     if (!$('name-input').value.trim()) $('name-input').value = String(info.name || '').slice(0, 16);
     $('steam-invite').classList.remove('hidden');
     for (const id of achUnlocked) desktop.unlockAchievement?.(id); // carry over progress made before Steam
+    if (info.deck) {
+      // Steam Deck: full screen and a slightly larger interface by default.
+      desktop.toggleFullscreen(true);
+      if (!local.get('hr_uiscale')) { local.set('hr_uiscale', '1.15'); applyUiScale(1.15); }
+    }
     if (app.code) hostSteamLobby(app.code);
     tryAutoJoin();
   }).catch(() => { app.steam = { ok: false }; });

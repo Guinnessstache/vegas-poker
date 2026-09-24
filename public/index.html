@@ -128,6 +128,9 @@
         <label>Graphics
           <select id="quality-select"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
         </label>
+        <label>Interface size
+          <select id="uiscale-select"><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option><option value="1.5">150%</option></select>
+        </label>
         <label class="chk"><input type="checkbox" id="sfx-toggle" checked /> Sound effects</label>
         <label class="chk"><input type="checkbox" id="amb-toggle" checked /> Casino ambience</label>
         <label class="chk"><input type="checkbox" id="hudcards-toggle" /> My cards on screen</label>
@@ -143,6 +146,7 @@
       </div>
     </div>
 
+    <div id="pad-hints" class="pad-hints" aria-hidden="true"></div>
     <div id="banner" class="banner"><div class="b-title"></div><div class="b-sub"></div></div>
     <div id="toast" class="toast"></div>
     <div id="ach-pop" class="ach-pop" role="status" aria-live="polite"><img class="ap-icon" alt="" /><div><div class="ap-label">Achievement unlocked</div><div class="ap-name"></div><div class="ap-desc"></div></div></div>
