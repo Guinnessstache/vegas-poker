@@ -1168,6 +1168,19 @@ if (desktop) {
   $('steam-help-copy').addEventListener('click', () => $('copy-link').click());
 
   $('fullscreen-btn').addEventListener('click', (e) => { e.stopImmediatePropagation(); desktop.toggleFullscreen(); }, true);
+  // Quit (the desktop app has no browser chrome to close, especially in full screen).
+  const askQuit = () => {
+    $('menu').classList.add('hidden');
+    const hosting = app.code && HOSTING_HERE && app.room?.members.some((m) => !m.bot && m.pid !== app.pid && m.connected);
+    $('quit-note').textContent = hosting ? 'You\u2019re hosting this table — quitting ends it for everyone.' : app.code ? 'You\u2019ll leave the table.' : '';
+    const d = $('quit-dialog');
+    d.returnValue = '';
+    d.showModal();
+    if (padStyle) nav.focus(d.querySelector('[data-pad-default]'));
+  };
+  $('quit-dialog').querySelector('button[value="quit"]').addEventListener('click', () => desktop.quit());
+  for (const id of ['quit-btn', 'lobby-quit-btn']) { $(id).classList.remove('hidden'); $(id).addEventListener('click', askQuit); }
+
   if (desktop.openLog) {
     for (const id of ['log-btn', 'lobby-log-btn']) { $(id).classList.remove('hidden'); $(id).addEventListener('click', () => desktop.openLog()); }
   }

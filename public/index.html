@@ -95,7 +95,7 @@
       </div>
       <div id="server-status" class="server-status connecting" role="status" aria-live="polite"><span class="dot"></span><span class="ss-text">Connecting to the game server…</span></div>
       <p id="lobby-error" class="error"></p>
-      <p class="lobby-foot"><button id="lobby-ach-btn" class="btn small ghost" type="button">🏆 Achievements</button> <button id="lobby-log-btn" class="btn small ghost hidden" type="button">Open log file</button></p>
+      <p class="lobby-foot"><button id="lobby-ach-btn" class="btn small ghost" type="button">🏆 Achievements</button> <button id="lobby-log-btn" class="btn small ghost hidden" type="button">Open log file</button> <button id="lobby-quit-btn" class="btn small ghost hidden" type="button">Quit game</button></p>
     </div>
   </section>
 
@@ -142,6 +142,7 @@
         <button id="ach-btn" class="btn small ghost">Achievements</button>
         <button id="log-btn" class="btn small ghost hidden">Open log file</button>
         <button id="leave-btn" class="btn small red">Leave table</button>
+        <button id="quit-btn" class="btn small ghost hidden">Quit game</button>
         <div class="fps" id="fps"></div>
       </div>
     </div>
@@ -270,6 +271,14 @@
       <p id="ach-summary" class="hint"></p>
       <div id="ach-list" class="ach-list"></div>
       <div class="dlg-btns"><button value="ok" class="btn gold small">Close</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="quit-dialog">
+    <form method="dialog">
+      <h3>Quit High Roller Hold'em?</h3>
+      <p id="quit-note" class="hint"></p>
+      <div class="dlg-btns"><button value="cancel" class="btn ghost small" data-pad-default>Keep playing</button><button value="quit" class="btn red small">Quit</button></div>
     </form>
   </dialog>
 
