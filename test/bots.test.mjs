@@ -46,8 +46,9 @@ let sid = 0;
 const fakeSocket = () => ({ id: `s${++sid}`, join() {}, emit() {} });
 const KEY = (n) => `human-key-${n}-xxxxxxxxxxxxxxxx`;
 
-async function playFor(room, ms, humans = []) {
-  for (let t = 0; t < ms; t += 250) {
+// Advance simulated time, playing check/call for the humans, until `done()` or `ms` runs out.
+async function playFor(room, ms, humans = [], done = () => false) {
+  for (let t = 0; t < ms && !done(); t += 250) {
     const seat = room.table.toAct;
     const h = humans.find((m) => m.seat === seat && seat >= 0);
     if (h) { const l = room.table.legalActions(seat); if (l) room.act(h, l.canCheck ? 'check' : 'call'); }
@@ -71,7 +72,7 @@ test('auto-fill, seat hand-off, rebuys and pause when only bots remain', async (
     for (const b of room.bots()) assert.ok(b.seat >= 0 || b.bot.leaveAfterHand);
     // A second human joins: a bot gives up its seat (now or at the end of the hand).
     const bob = room.join(fakeSocket(), KEY('b'), 'Bob');
-    await playFor(room, 30_000, [alice, bob]);
+    await playFor(room, 180_000, [alice, bob], () => room.betweenHands() && room.seatedCount() === 5);
     assert.ok(bob.seat >= 0, 'Bob got a seat');
     assert.equal(room.seatedCount(), 5, 'still 5 players');
     assert.equal(room.bots().length, 3);
@@ -100,9 +101,11 @@ test('freezeout: busted bots leave and are not replaced', async () => {
     assert.equal(room.seatedCount(), 4);
     room.setSittingOut(alice, true); // let the bots fight it out
     room.start(alice);
-    await playFor(room, 900_000, []);
-    const botsLeft = room.bots().filter((b) => b.seat >= 0).length;
-    assert.ok(botsLeft <= 1, `bots still seated: ${botsLeft}`);
+    let most = 0;
+    await playFor(room, 3_600_000, [], () => { most = Math.max(most, room.bots().length); return room.bots().length <= 1; });
+    assert.equal(most, 3, 'no replacement bots were added');
+    assert.ok(room.bots().length <= 1, `bots still seated: ${room.bots().length}`);
+    for (const b of room.bots()) assert.ok(room.table.seats[b.seat].stack > 0);
     room.destroy();
   } finally {
     mock.timers.reset();

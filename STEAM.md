@@ -62,5 +62,5 @@ Output: `dist\win-unpacked\HighRoller.exe` (+ runtime files). That whole folder 
 3. Steamworks → Installation → General: launch option executable `HighRoller.exe`.
 4. `npm run dist:win`, then upload with SteamPipe:
    `steamcmd +login <builder_account> +run_app_build <full path>\steam\app_build.vdf +quit`
-5. Achievements (next step) are defined in Steamworks → Stats & Achievements, then unlocked
-   from the game with `hrDesktop.unlockAchievement('API_NAME')`.
+5. Achievements: enter the 20 in `steam/ACHIEVEMENTS.md` (names, descriptions, icons in
+   `steam/achievements/`) under Steamworks → Stats & Achievements, then Publish.

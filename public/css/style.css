@@ -330,3 +330,23 @@ dialog select { width: 100%; margin-top: 10px; background: #000; border: 1px sol
 .bot-row .br-level { font-size: 12px; color: var(--muted); }
 .bot-row .br-auto { font-size: 11px; color: var(--gold); }
 .bot-empty { color: var(--muted); padding: 8px; }
+
+/* ---------- achievements ---------- */
+.ach-pop { position: fixed; top: 18px; left: 50%; transform: translate(-50%, -140%); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 12px; min-width: 280px; max-width: 92vw; background: linear-gradient(180deg, #2a1a0c, #140b05); border: 1px solid var(--gold); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.6), 0 0 24px rgba(232,192,96,.35); transition: transform .45s cubic-bezier(.2,.9,.3,1.2); pointer-events: none; }
+.ach-pop.show { transform: translate(-50%, 0); }
+.ach-pop .ap-icon { width: 52px; height: 52px; border-radius: 50%; }
+.ach-pop .ap-label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.ach-pop .ap-name { font-family: var(--display); color: var(--gold); font-size: 17px; }
+.ach-pop .ap-desc { font-size: 12px; color: var(--ink); opacity: .85; }
+#ach-dialog { width: min(520px, 94vw); }
+.ach-list { display: flex; flex-direction: column; gap: 6px; max-height: min(60vh, 520px); overflow-y: auto; margin-top: 8px; }
+.ach-row { display: flex; gap: 12px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.03); opacity: .6; }
+.ach-row.done { opacity: 1; background: rgba(232,192,96,.08); border: 1px solid rgba(232,192,96,.25); }
+.ach-icon { width: 44px; height: 44px; border-radius: 50%; flex: none; }
+.ach-txt { flex: 1; min-width: 0; }
+.ach-name { font-weight: 700; }
+.ach-row.done .ach-name { color: var(--gold); }
+.ach-desc { font-size: 13px; color: var(--muted); }
+.ach-bar { height: 5px; background: rgba(255,255,255,.1); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.ach-bar > div { height: 100%; background: var(--gold); }
+.ach-count { font-size: 11px; color: var(--muted); margin-top: 2px; }

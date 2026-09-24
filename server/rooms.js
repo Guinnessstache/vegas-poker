@@ -2,6 +2,7 @@
 
 import { randomBytes, randomInt } from 'node:crypto';
 import { Table, MAX_SEATS } from './poker.js';
+import { handAwards } from './awards.js';
 import { BOT_LEVELS, LEVEL_LABEL, makeBotProfile, pickBotName, decide, thinkTime, botLine } from './bots.js';
 
 const SEAT_ORDER = [3, 4, 2, 5, 1, 6, 0, 7]; // best views (facing the dealer) first
@@ -292,6 +293,30 @@ export class Room {
     this.afterChange();
   }
 
+  // Achievements earned this hand, sent to each (human) player's game to unlock.
+  sendAwards() {
+    const t = this.table;
+    let awards;
+    try {
+      awards = handAwards(t, {
+        startingStack: this.settings.startingStack,
+        isHuman: (seat) => { const m = this.memberBySeat(seat); return !!m && !m.bot; },
+        botLevel: (seat) => this.memberBySeat(seat)?.bot?.level || null,
+        peakSeated: this.peakSeated || 0,
+      });
+    } catch (e) { console.error('[awards]', e); return; }
+    for (const [seat, a] of awards) {
+      const m = this.memberBySeat(seat);
+      if (!m || m.bot) continue;
+      // Comeback: dropped under 5 big blinds, later back to a full starting stack.
+      const stack = t.seats[seat]?.stack ?? 0;
+      if (stack === 0) m.wasShort = false; // busting and rebuying isn't a comeback
+      else if (stack < t.bb * 5) m.wasShort = true;
+      if (m.wasShort && stack >= this.settings.startingStack) { a.ids.add('COMEBACK'); m.wasShort = false; }
+      this.toSocket(m, 'awards', { ids: [...a.ids], stats: a.stats });
+    }
+  }
+
   // After each hand: bots that busted rebuy (or leave in a freezeout), table talk, fill seats.
   botsAfterHand(results) {
     const t = this.table;
@@ -348,7 +373,10 @@ export class Room {
       t.bb = this.settings.bigBlind;
       // Sync names.
       for (const m of this.members.values()) if (m.seat >= 0 && t.seats[m.seat]) t.seats[m.seat].name = m.name;
-      if (t.startHand()) this.afterChange();
+      if (t.startHand()) {
+        this.peakSeated = Math.max(this.peakSeated || 0, t.seats.filter((p) => p && p.inHand).length);
+        this.afterChange();
+      }
     }, 1200);
   }
 
@@ -380,6 +408,7 @@ export class Room {
       }, delay);
     } else if (t.handOver && !this.timers.next) {
       const uncontested = t.lastResults?.uncontested;
+      this.sendAwards();
       this.timers.next = setTimeout(() => {
         this.timers.next = null;
         const results = t.lastResults;
@@ -449,6 +478,7 @@ export class Room {
     if (p.stack >= this.settings.startingStack) return 'You already have a full stack';
     const add = this.settings.startingStack - p.stack;
     p.stack = this.settings.startingStack;
+    m.wasShort = false; // topping up isn't a comeback
     this.systemChat(`${m.name} topped up (+${add.toLocaleString()}).`);
     this.afterChange();
     this.maybeStartHand();

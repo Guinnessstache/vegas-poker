@@ -95,7 +95,7 @@
       </div>
       <div id="server-status" class="server-status connecting" role="status" aria-live="polite"><span class="dot"></span><span class="ss-text">Connecting to the game server…</span></div>
       <p id="lobby-error" class="error"></p>
-      <p class="lobby-foot"><button id="lobby-log-btn" class="btn small ghost hidden" type="button">Open log file</button></p>
+      <p class="lobby-foot"><button id="lobby-ach-btn" class="btn small ghost" type="button">🏆 Achievements</button> <button id="lobby-log-btn" class="btn small ghost hidden" type="button">Open log file</button></p>
     </div>
   </section>
 
@@ -136,6 +136,7 @@
         <label class="chk"><input type="checkbox" id="tiles-toggle" /> Show video tiles</label>
         <button id="fullscreen-btn" class="btn small ghost">Fullscreen</button>
         <button id="stand-btn" class="btn small ghost">Stand up</button>
+        <button id="ach-btn" class="btn small ghost">Achievements</button>
         <button id="log-btn" class="btn small ghost hidden">Open log file</button>
         <button id="leave-btn" class="btn small red">Leave table</button>
         <div class="fps" id="fps"></div>
@@ -144,6 +145,7 @@
 
     <div id="banner" class="banner"><div class="b-title"></div><div class="b-sub"></div></div>
     <div id="toast" class="toast"></div>
+    <div id="ach-pop" class="ach-pop" role="status" aria-live="polite"><img class="ap-icon" alt="" /><div><div class="ap-label">Achievement unlocked</div><div class="ap-name"></div><div class="ap-desc"></div></div></div>
     <div id="tiles" class="tiles hidden"></div>
 
     <div class="bottom-left">
@@ -255,6 +257,15 @@
         <p class="hint">Bots fill empty seats up to this many players and step aside when friends join.</p>
       </div>
       <div class="dlg-btns"><button value="ok" class="btn gold small">Done</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="ach-dialog">
+    <form method="dialog">
+      <h3>Achievements</h3>
+      <p id="ach-summary" class="hint"></p>
+      <div id="ach-list" class="ach-list"></div>
+      <div class="dlg-btns"><button value="ok" class="btn gold small">Close</button></div>
     </form>
   </dialog>
 

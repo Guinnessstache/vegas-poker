@@ -5,6 +5,7 @@ import { GameView } from './game.js';
 import { MediaManager } from './media.js';
 import { Sound } from './sound.js';
 import { evaluate } from '/shared/handEval.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_BY_ID } from './achievements.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n || 0).toLocaleString();
@@ -679,6 +680,7 @@ $('media-start').addEventListener('click', async () => {
     $('mic-btn').disabled = !got.mic;
     $('cam-btn').disabled = !got.cam;
     updateMediaButtons();
+    if (got.cam && app.state?.you?.seat >= 0) grantAchievement('SAY_CHEESE');
     if (!got.cam) toast('No camera found — joined with microphone only.');
     else if (!got.mic) toast('No microphone found — joined with camera only.');
   } catch (err) {
@@ -785,6 +787,82 @@ function toast(msg, ms = 3200) {
   toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
+// ---------------- achievements ----------------
+// The server tells us what we earned each hand; unlocks and running totals live on this PC
+// (and on Steam in the desktop build). Steam's own popup can't draw over the game window,
+// so the game shows its own.
+const achUnlocked = new Set((() => { try { return JSON.parse(local.get('hr_ach') || '[]'); } catch { return []; } })());
+const achStats = (() => { try { return { hands: 0, knockouts: 0, ...JSON.parse(local.get('hr_stats') || '{}') }; } catch { return { hands: 0, knockouts: 0 }; } })();
+const achQueue = [];
+let achShowing = false;
+
+function grantAchievement(id) {
+  const a = ACHIEVEMENT_BY_ID[id];
+  if (!a) return;
+  if (!achUnlocked.has(id)) {
+    achUnlocked.add(id);
+    local.set('hr_ach', JSON.stringify([...achUnlocked]));
+    achQueue.push(a);
+    showNextAchievement();
+    if ($('ach-dialog').open) renderAchievements();
+  }
+  desktop?.unlockAchievement?.(id);
+}
+
+function showNextAchievement() {
+  if (achShowing || !achQueue.length) return;
+  const a = achQueue.shift();
+  const el = $('ach-pop');
+  el.querySelector('.ap-icon').src = `/img/ach/${a.id}.jpg`;
+  el.querySelector('.ap-name').textContent = a.name;
+  el.querySelector('.ap-desc').textContent = a.desc;
+  achShowing = true;
+  el.classList.add('show');
+  sfx.play?.('win');
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => { achShowing = false; showNextAchievement(); }, 450);
+  }, 4200);
+}
+
+socket.on('awards', ({ ids = [], stats = {} } = {}) => {
+  achStats.hands += Number(stats.hands) || 0;
+  achStats.knockouts += Number(stats.knockouts) || 0;
+  local.set('hr_stats', JSON.stringify(achStats));
+  for (const id of ids) grantAchievement(id);
+  for (const a of ACHIEVEMENTS) if (a.count && achStats[a.count.stat] >= a.count.target) grantAchievement(a.id);
+  if ($('ach-dialog').open) renderAchievements();
+});
+
+function renderAchievements() {
+  const list = $('ach-list');
+  list.textContent = '';
+  $('ach-summary').textContent = `${achUnlocked.size} of ${ACHIEVEMENTS.length} unlocked · ${achStats.hands.toLocaleString()} hand${achStats.hands === 1 ? '' : 's'} played`;
+  for (const a of ACHIEVEMENTS) {
+    const done = achUnlocked.has(a.id);
+    const row = document.createElement('div');
+    row.className = `ach-row${done ? ' done' : ''}`;
+    const icon = document.createElement('img'); icon.className = 'ach-icon'; icon.alt = ''; icon.src = `/img/ach/${a.id}${done ? '' : '_locked'}.jpg`;
+    const txt = document.createElement('div'); txt.className = 'ach-txt';
+    const nm = document.createElement('div'); nm.className = 'ach-name'; nm.textContent = a.name;
+    const ds = document.createElement('div'); ds.className = 'ach-desc'; ds.textContent = a.desc;
+    txt.append(nm, ds);
+    if (a.count && !done) {
+      const n = Math.min(achStats[a.count.stat] || 0, a.count.target);
+      const bar = document.createElement('div'); bar.className = 'ach-bar';
+      const fill = document.createElement('div'); fill.style.width = `${(n / a.count.target) * 100}%`;
+      bar.append(fill);
+      const lbl = document.createElement('div'); lbl.className = 'ach-count'; lbl.textContent = `${n.toLocaleString()} / ${a.count.target.toLocaleString()}`;
+      txt.append(bar, lbl);
+    }
+    row.append(icon, txt);
+    list.append(row);
+  }
+}
+for (const id of ['ach-btn', 'lobby-ach-btn']) {
+  $(id).addEventListener('click', () => { $('menu')?.classList.add('hidden'); renderAchievements(); $('ach-dialog').showModal(); });
+}
+
 // Expose for debugging in the console.
 window.__poker = { app, world, view, media, socket };
 
@@ -808,6 +886,7 @@ if (desktop) {
     if (!info?.ok) return;
     if (!$('name-input').value.trim()) $('name-input').value = String(info.name || '').slice(0, 16);
     $('steam-invite').classList.remove('hidden');
+    for (const id of achUnlocked) desktop.unlockAchievement?.(id); // carry over progress made before Steam
     if (app.code) hostSteamLobby(app.code);
     tryAutoJoin();
   }).catch(() => { app.steam = { ok: false }; });
