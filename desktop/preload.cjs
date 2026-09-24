@@ -9,10 +9,10 @@ const arg = (name) => {
 
 contextBridge.exposeInMainWorld('hrDesktop', {
   isDesktop: true,
-  onlineServer: arg('hr-online'),
   localServer: arg('hr-local'),
   steamInfo: () => ipcRenderer.invoke('hr:steam-info'),
-  hostTable: (code, server) => ipcRenderer.invoke('hr:host-table', { code, server }),
+  hostTable: (code) => ipcRenderer.invoke('hr:host-table', { code }),
+  findTable: (code) => ipcRenderer.invoke('hr:find-table', code),
   invite: () => ipcRenderer.invoke('hr:invite'),
   friends: () => ipcRenderer.invoke('hr:friends'),
   inviteFriend: (id) => ipcRenderer.invoke('hr:invite-friend', id),
@@ -22,4 +22,6 @@ contextBridge.exposeInMainWorld('hrDesktop', {
   toggleFullscreen: (on) => ipcRenderer.invoke('hr:fullscreen', on),
   quit: () => ipcRenderer.invoke('hr:quit'),
   onJoinTable: (cb) => ipcRenderer.on('hr:join-table', (_e, target) => cb(target)),
+  onHostLost: (cb) => ipcRenderer.on('hr:host-lost', () => cb()),
+  onNotice: (cb) => ipcRenderer.on('hr:notice', (_e, msg) => cb(msg)),
 });

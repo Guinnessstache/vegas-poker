@@ -198,14 +198,13 @@
   <dialog id="steam-help">
     <form method="dialog">
       <h3>Invite Steam friends</h3>
-      <p>The Steam invite window lives in the Steam overlay, which Steam only adds to games it launched. Your table's Steam lobby is open, so friends can still get in:</p>
+      <p>Couldn&rsquo;t read your Steam friends list right now. Friends can still get in:</p>
       <ul class="sh-list">
-        <li><b>From Steam:</b> they right-click you in their Friends list → <em>Join Game</em> (while they have the game open).</li>
-        <li><b>From a browser or the game:</b> send them this link or the table code.</li>
+        <li><b>With the table code:</b> they open the game, click <em>Join table</em> and enter it.</li>
+        <li><b>From Steam:</b> they right-click you in their Friends list &rarr; <em>Join Game</em> (while they have the game open).</li>
       </ul>
       <code class="sh-link"></code>
-      <p class="hint">Testing tip: add <code>HighRoller.exe</code> to Steam as a <em>Non-Steam Game</em> and launch it from your library — then the invite window works.</p>
-      <div class="dlg-btns"><button type="button" id="steam-help-copy" class="btn small">Copy link</button><button value="ok" class="btn gold small">Got it</button></div>
+      <div class="dlg-btns"><button type="button" id="steam-help-copy" class="btn small">Copy invite</button><button value="ok" class="btn gold small">Got it</button></div>
     </form>
   </dialog>
 
@@ -214,8 +213,8 @@
       <h3>Invite Steam friends</h3>
       <input id="sf-search" class="sf-search" placeholder="Search friends…" autocomplete="off" />
       <div id="sf-list" class="sf-list"></div>
-      <p class="hint">Invites arrive in the friend's Steam chat. They click <em>Accept</em> (with the game installed) and land at this table. Friends without Steam can use the invite link.</p>
-      <div class="dlg-btns"><button type="button" id="sf-copy" class="btn small">Copy invite link</button><button value="ok" class="btn gold small">Done</button></div>
+      <p class="hint">Invites arrive in the friend&rsquo;s Steam chat. They click <em>Accept</em> (with the game installed) and land at this table. Or share the table code &mdash; they enter it under <em>Join table</em>.</p>
+      <div class="dlg-btns"><button type="button" id="sf-copy" class="btn small">Copy table code</button><button value="ok" class="btn gold small">Done</button></div>
     </form>
   </dialog>
 

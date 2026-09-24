@@ -38,6 +38,9 @@ function loadFlatApi() {
       imageSize: lib.func('bool SteamAPI_ISteamUtils_GetImageSize(void *self, int image, _Out_ uint32_t *w, _Out_ uint32_t *h)'),
       imageRGBA: lib.func('bool SteamAPI_ISteamUtils_GetImageRGBA(void *self, int image, _Out_ uint8_t *buf, int size)'),
       inviteToLobby: lib.func('bool SteamAPI_ISteamMatchmaking_InviteUserToLobby(void *self, uint64_t lobby, uint64_t invitee)'),
+      lobbyStringFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListStringFilter(void *self, const char *key, const char *value, int cmp)'),
+      lobbyDistanceFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListDistanceFilter(void *self, int filter)'),
+      lobbyCountFilter: lib.func('void SteamAPI_ISteamMatchmaking_AddRequestLobbyListResultCountFilter(void *self, int max)'),
     };
     return f;
   } catch (e) {
@@ -46,6 +49,7 @@ function loadFlatApi() {
   }
 }
 
+const GAME_TAG = 'high-roller-holdem-p2p-1'; // lobbies from this version of the game
 const PERSONA = ['Offline', 'Online', 'Busy', 'Away', 'Snooze', 'Looking to trade', 'Looking to play', 'Invisible'];
 const FRIEND_FLAG_IMMEDIATE = 0x04;
 
@@ -137,27 +141,89 @@ export class Steam {
     this.client.callback.register(steamworks.SteamCallback.GameLobbyJoinRequested, (ev) => handler(ev.lobby_steam_id));
   }
 
-  // Create (or reuse) a friends-only lobby that points at our poker table.
-  async hostTable({ code, server }) {
+  get mySteamId() {
+    try { return String(this.client.localplayer.getSteamId().steamId64); } catch { return null; }
+  }
+
+  // Create (or reuse) the Steam lobby for a table this player is hosting. The lobby only
+  // carries the table code and the host's Steam ID; the game itself runs in the host's app.
+  // Public so friends can find it by table code (searches only match the exact code).
+  async hostTable({ code }) {
     if (!this.client) return null;
-    if (this.lobby && this.lobby.getData('code') === code && this.lobby.getData('server') === server) return String(this.lobby.id);
+    const me = this.mySteamId;
+    if (this.lobby && this.lobby.getData('code') === code && this.lobby.getData('host') === me) return String(this.lobby.id);
     this.leave();
     const { matchmaking } = this.client;
-    this.lobby = await matchmaking.createLobby(1 /* FriendsOnly */, 16);
-    this.lobby.mergeFullData({ code, server, game: 'high-roller-holdem' });
+    this.lobby = await matchmaking.createLobby(2 /* Public */, 16);
+    this.lobby.mergeFullData({ code, host: me, game: GAME_TAG });
     this.lobby.setJoinable(true);
     this.setPresence(code);
     return String(this.lobby.id);
   }
 
-  // Join a lobby by id and read the table it points at.
+  // Find a hosted table by its code (anywhere in the world).
+  async findTable(code) {
+    if (!this.client) return null;
+    const f = this.flatApi();
+    if (f) {
+      const mm = f.matchmaking();
+      f.lobbyStringFilter(mm, 'game', GAME_TAG, 0 /* Equal */);
+      f.lobbyStringFilter(mm, 'code', code, 0);
+      f.lobbyDistanceFilter(mm, 3 /* Worldwide */);
+      f.lobbyCountFilter(mm, 10);
+    }
+    const lobbies = await this.client.matchmaking.getLobbies();
+    const hit = lobbies.find((l) => l.getData('game') === GAME_TAG && l.getData('code') === code);
+    return hit ? String(hit.id) : null;
+  }
+
+  // Join a table's lobby and return who is hosting it.
   async joinLobby(lobbyId) {
     if (!this.client) return null;
     this.leave();
     this.lobby = await this.client.matchmaking.joinLobby(BigInt(lobbyId));
     const data = this.lobby.getFullData();
+    const host = data.host || String(this.lobby.getOwner().steamId64);
+    const hostHere = this.lobby.getMembers().some((m) => String(m.steamId64) === host);
     if (data.code) this.setPresence(data.code);
-    return { code: data.code, server: data.server || null };
+    return { code: data.code || null, host, hostHere, game: data.game || null };
+  }
+
+  isHosting() {
+    return !!this.lobby && this.lobby.getData('host') === this.mySteamId;
+  }
+
+  isLobbyMember(steamId) {
+    if (!this.lobby) return false;
+    try { return this.lobby.getMembers().some((m) => String(m.steamId64) === String(steamId)); } catch { return false; }
+  }
+
+  // Steam peer-to-peer packets (relayed through Valve's network when a direct path isn't possible).
+  startNetworking({ onPacket, onPeerFailed }) {
+    if (!this.client) return false;
+    if (this._net) return true;
+    const n = this.client.networking;
+    const cb = this.client.callback;
+    cb.register(steamworks.SteamCallback.P2PSessionRequest, ({ remote }) => {
+      try { n.acceptP2PSession(remote); } catch { /* ignore */ }
+    });
+    cb.register(steamworks.SteamCallback.P2PSessionConnectFail, ({ remote }) => onPeerFailed?.(String(remote)));
+    this._net = setInterval(() => {
+      for (let i = 0; i < 512; i++) {
+        let size = 0;
+        try { size = n.isP2PPacketAvailable(); } catch { size = 0; }
+        if (!size) break;
+        let p;
+        try { p = n.readP2PPacket(size); } catch { break; }
+        try { onPacket(String(p.steamId.steamId64), p.data); } catch (e) { console.warn('[steam] packet handler', e); }
+      }
+    }, 4);
+    return true;
+  }
+
+  sendPacket(steamId, buf) {
+    if (!this.client) return false;
+    return this.client.networking.sendP2PPacket(BigInt(steamId), 2 /* Reliable */, buf);
   }
 
   invite() {
