@@ -319,7 +319,8 @@ export function buildCasino(scene, quality = 'high') {
   function blackjackTable(x, z, rot, occupied) {
     const g = new THREE.Group();
     const R = 1.1;
-    const dShape = (r) => { const sh = new THREE.Shape(); sh.absarc(0, 0, r, Math.PI, 0, true); sh.lineTo(r, 0.15); sh.lineTo(-r, 0.15); sh.closePath(); return sh; };
+    const dShape = (r) => { const sh = new THREE.Shape(); sh.absarc(0, 0, r, Math.PI, 0, false); // curve on the players' side (+Z)
+      sh.lineTo(r, 0.15); sh.lineTo(-r, 0.15); sh.closePath(); return sh; };
     // Wood body with a little thickness (shape y -> world -z, extrusion -> up)
     const body = new THREE.Mesh(new THREE.ExtrudeGeometry(dShape(R + 0.04), { depth: 0.1, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 2, curveSegments: 40 }).rotateX(-Math.PI / 2), bjWood);
     body.position.y = 0.655;
