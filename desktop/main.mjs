@@ -181,6 +181,10 @@ ipcMain.handle('hr:host-table', async (_e, { code, listed }) => {
     return { ok: false, error: String(e?.message || e) };
   }
 });
+ipcMain.handle('hr:invite-info', () => {
+  const i = steam?.inviteInfo?.();
+  return i ? { ...i, base: config.inviteBase || '' } : null;
+});
 ipcMain.handle('hr:update-table', (_e, info) => steam?.updateTable?.(info) ?? false);
 ipcMain.handle('hr:list-tables', async () => {
   try { return { ok: true, tables: (await steam?.listTables?.()) || [] }; } catch (e) { console.warn('[steam] list tables failed', e); return { ok: false, tables: [] }; }

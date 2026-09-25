@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Join a table — High Roller Hold'em</title>
+  <meta name="description" content="You're invited to a High Roller Hold'em poker table. Click to join through Steam." />
+  <meta property="og:title" content="Join my High Roller Hold'em table" />
+  <meta property="og:description" content="3D No-Limit Texas Hold'em with friends — click to sit down through Steam." />
+  <meta property="og:image" content="https://guinnessstache.github.io/vegas-poker/img/social.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#0b0604" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠</text></svg>" />
+  <style>
+    :root { --bg: #0b0604; --panel: #1a0f0a; --gold: #d4a84a; --gold-2: #8a6a2a; --ink: #f3ead8; --muted: #b7a88f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+      background: radial-gradient(ellipse at 50% 20%, #3a1410 0%, var(--bg) 70%); color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .card { width: min(440px, 100%); background: var(--panel); border: 1px solid var(--gold-2); border-radius: 18px;
+      padding: 28px 24px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+    .suit { font-size: 40px; color: var(--gold); line-height: 1; }
+    h1 { font: 800 26px/1.2 Georgia, "Times New Roman", serif; letter-spacing: .04em; color: var(--gold); margin: 8px 0 4px; }
+    p { color: var(--muted); margin: 8px 0; }
+    .code { display: inline-block; font: 700 30px/1 ui-monospace, Consolas, monospace; letter-spacing: .25em;
+      color: var(--ink); background: #000; border: 1px solid var(--gold-2); border-radius: 10px; padding: 10px 8px 10px 16px; margin: 10px 0; }
+    .btn { display: block; width: 100%; margin-top: 16px; padding: 14px 18px; border-radius: 12px; border: 0; cursor: pointer;
+      font: 700 17px/1 system-ui, sans-serif; text-decoration: none; color: #1a0f0a;
+      background: linear-gradient(180deg, #f0cf7a, var(--gold)); }
+    .btn.ghost { background: transparent; color: var(--gold); border: 1px solid var(--gold-2); }
+    .small { font-size: 13px; }
+    .hidden { display: none; }
+    ol { text-align: left; color: var(--muted); padding-left: 20px; margin: 14px 0 0; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="suit">♠</div>
+    <h1>High Roller Hold'em</h1>
+    <p id="lead">You're invited to a poker table.</p>
+    <div id="code" class="code hidden"></div>
+    <a id="join" class="btn hidden" href="#">Join in Steam</a>
+    <a id="store" class="btn ghost hidden" href="#">Don't have it? Get it on Steam</a>
+    <ol id="manual">
+      <li>Open <b>High Roller Hold'em</b> from your Steam library.</li>
+      <li>Click <b>Join table</b> and enter the code above.</li>
+    </ol>
+    <p class="small" id="note"></p>
+  </main>
+  <script>
+    // Everything comes from the link: c = table code, a = Steam app id, l = lobby id, h = host.
+    // Only digits/letters are accepted, so nothing from the URL is ever rendered as HTML.
+    const q = new URLSearchParams(location.search);
+    const code = (q.get('c') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    const app = (q.get('a') || '').replace(/\D/g, '').slice(0, 12);
+    const lobby = (q.get('l') || '').replace(/\D/g, '').slice(0, 24);
+    const host = (q.get('h') || '').replace(/\D/g, '').slice(0, 24);
+    const $ = (id) => document.getElementById(id);
+    if (code) { $('code').textContent = code; $('code').classList.remove('hidden'); }
+    else $('manual').classList.add('hidden');
+    if (app && lobby) {
+      const url = `steam://joinlobby/${app}/${lobby}${host ? `/${host}` : ''}`;
+      $('join').href = url;
+      $('join').classList.remove('hidden');
+      $('note').textContent = 'Steam will start the game and seat you at the table. If nothing happens, make sure Steam is running, or use the code.';
+      if (app !== '480') {
+        $('store').href = `https://store.steampowered.com/app/${app}/`;
+        $('store').classList.remove('hidden');
+      }
+      // Try once automatically; browsers ask before opening Steam.
+      setTimeout(() => { location.href = url; }, 600);
+    } else if (!code) {
+      $('lead').textContent = 'This invite link is incomplete — ask your friend for the table code.';
+    }
+  </script>
+</body>
+</html>

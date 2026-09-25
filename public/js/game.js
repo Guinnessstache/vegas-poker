@@ -125,6 +125,7 @@ export class GameView {
     for (const s of this.seats) s.avatar.pickRig();
     const d = templates?.[DEALER_CODE];
     this.dealer.setRig(d ? new PersonRig(d, { standing: true }) : null);
+    this.world.casino?.setPeople?.(templates);
   }
 
   makeSeatLabel(i) {

@@ -1,4 +1,6 @@
 {
   "steamAppId": 480,
-  "_comment": "steamAppId 480 is Valve's public test app (Spacewar) for development. Replace it with your real App ID after paying the Steam Direct fee. There is no online server: each table is hosted inside the creator's game and friends connect through Steam."
+  "_comment": "steamAppId 480 is Valve's public test app (Spacewar) for development. Replace it with your real App ID after paying the Steam Direct fee. There is no online server: each table is hosted inside the creator's game and friends connect through Steam.",
+  "inviteBase": "https://guinnessstache.github.io/vegas-poker/join.html",
+  "_inviteComment": "inviteBase: a static page (docs/join.html on GitHub Pages) that turns a copied invite into a \"Join in Steam\" button. It needs no server."
 }

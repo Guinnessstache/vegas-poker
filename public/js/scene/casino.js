@@ -4,6 +4,7 @@ import {
   carpetTexture, damaskTexture, marbleTexture, woodTexture, neonTexture, slotScreen, radialGlowTexture, feltTexture,
 } from './textures.js';
 import { buildNPC } from './avatars.js';
+import { PersonRig, PEOPLE, DEALER_CODE } from './people.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ROOM = { w: 44, d: 36, h: 6.5 };
@@ -282,6 +283,11 @@ export function buildCasino(scene, quality = 'high') {
     bulbsAll.forEach((bulbs, bi) => bulbs.forEach((b, i) => { b.visible = (i + f + bi) % 3 !== 0; }));
   });
 
+  // Every background person, so realistic characters can stand in for them later.
+  // kind: slot | bar | seated (a table game) | standing | dealer
+  const npcs = [];
+  const addNpc = (h, kind) => { h.group.userData.npc = true; npcs.push({ h, kind }); return h; };
+
   // NPCs at some slot machines
   const npcAnim = [];
   let seed = 7;
@@ -289,7 +295,7 @@ export function buildCasino(scene, quality = 'high') {
     const bankGroup = root.children[root.children.length - banks.length + bi];
     for (let i = 0; i < b[2]; i++) {
       if ((i * 7 + bi * 3) % 3 !== 0) continue;
-      const h = buildNPC(seed += 13); // static (merged) to keep draw calls low
+      const h = addNpc(buildNPC(seed += 13), 'slot'); // static (merged) to keep draw calls low
       const x = (i - (b[2] - 1) / 2) * 0.78;
       h.group.position.set(x, 0.12, 0.72);
       h.group.rotation.y = 0; // facing -z toward machine (local)
@@ -313,7 +319,7 @@ export function buildCasino(scene, quality = 'high') {
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.74, 16), new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.5 }));
     base.position.y = 0.37;
     g.add(felt, rim, base);
-    const dealer = buildNPC(seed += 31, true);
+    const dealer = addNpc(buildNPC(seed += 31, true), 'dealer');
     dealer.group.userData.dynamic = true;
     dealer.group.position.set(0, 0, -0.35);
     dealer.group.rotation.y = Math.PI;
@@ -322,6 +328,7 @@ export function buildCasino(scene, quality = 'high') {
       const a = Math.PI * (0.25 + i * 0.25);
       const npc = buildNPC(seed += 17);
       npc.group.userData.dynamic = true;
+      if ((i + x) % 2) addNpc(npc, 'seated');
       npc.group.position.set(Math.cos(a) * 1.55, 0, Math.sin(a) * 1.55);
       npc.group.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
       if ((i + x) % 2) g.add(npc.group);
@@ -364,7 +371,7 @@ export function buildCasino(scene, quality = 'high') {
     g.add(tableTop, feltMesh, bowl, wheel, spindle, legs);
     animators.push((t, dt) => { wheel.rotation.y += dt * 0.9; spindle.rotation.y = wheel.rotation.y; });
     for (let i = 0; i < 4; i++) {
-      const npc = buildNPC(seed += 23, true);
+      const npc = addNpc(buildNPC(seed += 23, true), 'standing');
       npc.group.userData.dynamic = true;
       npc.group.position.set(-0.3 + i * 0.5, 0, i % 2 ? 0.95 : -0.95);
       npc.group.rotation.y = i % 2 ? 0 : Math.PI;
@@ -419,7 +426,7 @@ export function buildCasino(scene, quality = 'high') {
       stool.position.set(-4 + i * 1.15, 0, 3.1);
       g.add(stool);
       if (i % 3 === 1) {
-        const npc = buildNPC(seed += 41);
+        const npc = addNpc(buildNPC(seed += 41), 'bar');
         npc.group.position.set(-4 + i * 1.15, 0.2, 3.15);
         g.add(npc.group);
       }
@@ -446,11 +453,61 @@ export function buildCasino(scene, quality = 'high') {
     pokerSign.material.color.setScalar(2.2 * f);
   });
 
-  mergeStatic(root);
+  const npcMeshes = mergeStatic(root);
+
+  // ---------- Realistic background people (people.js) ----------
+  // Where each kind sits/stands and rests its hands, in the stand-in's local space (-Z forward).
+  const RIG_OPTS = {
+    slot: { seatTop: 0.55, hands: { x: 0.14, y: 0.93, z: -0.42 } },
+    bar: { seatTop: 0.62, hands: { x: 0.2, y: 1.0, z: -0.46 } },
+    seated: { seatTop: 0.55, hands: { x: 0.18, y: 0.8, z: -0.45 } },
+    standing: { standing: true, hands: { x: 0.2, y: 0.8, z: -0.3 } },
+    dealer: { standing: true, hands: { x: 0.2, y: 0.82, z: -0.32 } },
+  };
+  let rigs = []; let rigBuild = 0; let rr = 0;
+  function setPeople(templates) {
+    const build = ++rigBuild;
+    for (const r of rigs) r.rig.group.removeFromParent();
+    rigs = [];
+    const on = !!templates && PEOPLE.some((c) => templates[c]);
+    for (const m of npcMeshes) m.visible = !on;
+    for (const n of npcs) if (n.h.group.userData.dynamic) n.h.group.visible = !on;
+    if (!on) return;
+    const codes = PEOPLE.filter((c) => templates[c]);
+    // Build a few per frame so turning this on doesn't stall the game.
+    let i = 0;
+    const step = () => {
+      if (build !== rigBuild) return;
+      for (let k = 0; k < 4 && i < npcs.length; k++, i++) {
+        const n = npcs[i];
+        const code = n.kind === 'dealer' && templates[DEALER_CODE] ? DEALER_CODE : codes[(i * 3 + 1) % codes.length];
+        const rig = new PersonRig(templates[code], { ...RIG_OPTS[n.kind], lite: true });
+        const g = rig.group;
+        g.position.copy(n.h.group.position); g.quaternion.copy(n.h.group.quaternion);
+        n.h.group.parent.add(g);
+        rigs.push({ rig, acc: 0 });
+      }
+      if (i < npcs.length) setTimeout(step, 30);
+    };
+    step();
+  }
+  // Background people only need a gentle idle, so each is animated about 10 times a second.
+  animators.push((t, dt) => {
+    if (!rigs.length) return;
+    for (const r of rigs) r.acc += dt;
+    const n = Math.max(1, Math.ceil(rigs.length / 6));
+    for (let k = 0; k < n; k++) {
+      const r = rigs[rr++ % rigs.length];
+      r.rig.update(r.acc, {});
+      r.acc = 0;
+    }
+  });
 
   return {
     root,
     lamp,
+    npcs,
+    setPeople,
     update(t, dt) { for (const a of animators) a(t, dt); },
   };
 }
@@ -462,20 +519,23 @@ function mergeStatic(root) {
   const remove = [];
   root.traverse((o) => {
     if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) return;
-    for (let p = o; p; p = p.parent) if (p.userData.dynamic) return;
+    let npc = false;
+    for (let p = o; p; p = p.parent) { if (p.userData.dynamic) return; if (p.userData.npc) npc = true; }
     const geo = o.geometry;
     if (!geo.attributes.position || !geo.attributes.normal || !geo.attributes.uv) return;
-    const key = `${o.material.uuid}|${o.castShadow ? 1 : 0}${o.receiveShadow ? 1 : 0}`;
+    // People get their own merged meshes so they can be hidden when realistic ones take over.
+    const key = `${o.material.uuid}|${o.castShadow ? 1 : 0}${o.receiveShadow ? 1 : 0}|${npc ? 'npc' : ''}`;
     let g = geo.index ? geo.toNonIndexed() : geo.clone();
     for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
     g.morphAttributes = {};
     g.clearGroups();
     g.applyMatrix4(o.matrixWorld);
-    if (!buckets.has(key)) buckets.set(key, { material: o.material, cast: o.castShadow, recv: o.receiveShadow, geos: [] });
+    if (!buckets.has(key)) buckets.set(key, { material: o.material, cast: o.castShadow, recv: o.receiveShadow, npc, geos: [] });
     buckets.get(key).geos.push(g);
     remove.push(o);
   });
   for (const o of remove) o.removeFromParent();
+  const npcMeshes = [];
   for (const b of buckets.values()) {
     const merged = b.geos.length === 1 ? b.geos[0] : mergeGeometries(b.geos, false);
     if (!merged) continue;
@@ -484,5 +544,7 @@ function mergeStatic(root) {
     m.receiveShadow = b.recv;
     m.matrixAutoUpdate = false;
     root.add(m);
+    if (b.npc) npcMeshes.push(m);
   }
+  return npcMeshes;
 }

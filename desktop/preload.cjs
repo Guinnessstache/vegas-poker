@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('hrDesktop', {
   findTable: (code) => ipcRenderer.invoke('hr:find-table', code),
   invite: () => ipcRenderer.invoke('hr:invite'),
   friends: () => ipcRenderer.invoke('hr:friends'),
+  inviteInfo: () => ipcRenderer.invoke('hr:invite-info'),
   inviteFriend: (id) => ipcRenderer.invoke('hr:invite-friend', id),
   leaveTable: () => ipcRenderer.invoke('hr:leave-table'),
   unlockAchievement: (name) => ipcRenderer.invoke('hr:achievement', name),

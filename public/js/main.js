@@ -595,8 +595,21 @@ $('blinds-btn').addEventListener('click', () => {
 
 $('copy-link').addEventListener('click', async () => {
   if (desktop) {
-    const text = `Join my High Roller Hold'em table on Steam: open the game, then Join table with code ${app.code}`;
-    try { await navigator.clipboard.writeText(text); toast(`Invite copied — friends enter code ${app.code} in the game`, 4500); }
+    // A real link: the web page opens steam://joinlobby/…, which starts the game (or tells the
+    // running game) and drops the friend straight into this table. The code works as a backup.
+    const inv = await desktop.inviteInfo?.().catch(() => null);
+    let text; let note;
+    if (inv?.lobbyId) {
+      const q = new URLSearchParams({ c: app.code, a: String(inv.appId), l: inv.lobbyId, h: inv.steamId || '' });
+      const steamUrl = `steam://joinlobby/${inv.appId}/${inv.lobbyId}${inv.steamId ? `/${inv.steamId}` : ''}`;
+      const link = inv.base ? `${inv.base}?${q}` : steamUrl;
+      text = `Join my High Roller Hold'em poker table: ${link}\n(or open the game → Join table → code ${app.code})`;
+      note = 'Invite link copied — friends click it to join through Steam';
+    } else {
+      text = `Join my High Roller Hold'em table on Steam: open the game, then Join table with code ${app.code}`;
+      note = `Invite copied — friends enter code ${app.code} in the game`;
+    }
+    try { await navigator.clipboard.writeText(text); toast(note, 4500); }
     catch { toast(`Table code: ${app.code}`); }
     return;
   }

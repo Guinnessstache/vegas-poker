@@ -137,6 +137,7 @@ export class FakeSteam {
   startNetworking({ onPacket }) { this.onPacket = onPacket; return true; }
   sendPacket(peer, buf) { write(this.sock, { op: 'packet', to: String(peer), data: Buffer.from(buf).toString('base64') }); return true; }
   listFriends() { return this.users.filter((u) => u.id !== this.id).map((u) => ({ id: u.id, name: u.name, state: 1, status: 'Online' })); }
+  inviteInfo() { return this.lobbyId ? { appId: 480, lobbyId: this.lobbyId, steamId: this.id } : null; }
   inviteFriend(id) { if (!this.lobbyId) return false; write(this.sock, { op: 'invite', to: String(id), lobby: this.lobbyId }); return true; }
   invite() { return false; }
   leave() { if (this.lobbyId) write(this.sock, { op: 'leave', lobby: this.lobbyId }); this.lobbyId = null; this.data = null; this.members = []; }

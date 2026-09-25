@@ -133,9 +133,16 @@ function standPose(root, b) {
 
 // ---------------------------------------------------------------- one person
 export class PersonRig {
-  /** @param {object} template  from loadPeople  @param {{ standing?: boolean }} [o] */
-  constructor(template, { standing = false } = {}) {
+  /**
+   * @param {object} template  from loadPeople
+   * @param {{ standing?: boolean, seatTop?: number, hands?: {x:number,y:number,z:number}, lite?: boolean }} [o]
+   *   seatTop: cushion height; hands: where both hands rest (x = half-spacing, local metres,
+   *   -Z is forward); lite: skip blinking (background people seen from afar).
+   */
+  constructor(template, { standing = false, seatTop = SEAT_TOP, hands = null, lite = false } = {}) {
     this.standing = standing;
+    this.hands = hands;
+    this.lite = lite;
     this.root = cloneSkinned(template);
     this.group = new THREE.Group();
     this.group.add(this.root);
@@ -168,7 +175,7 @@ export class PersonRig {
       const toe = pos(this.root, this.b.Bip01_L_Toe0 || this.b.Bip01_L_Foot).multiplyScalar(0.01);
       this.root.position.set(pelvis.x, 0.01 - toe.y, pelvis.z);
     } else {
-      this.root.position.set(pelvis.x, SEAT_TOP + 0.1 - pelvis.y, 0.03 + pelvis.z);
+      this.root.position.set(pelvis.x, seatTop + 0.1 - pelvis.y, 0.03 + pelvis.z);
     }
     this.root.updateMatrixWorld(true);
 
@@ -282,11 +289,13 @@ export class PersonRig {
         let tgt;
         if (this.standing) {
           // Hands just over the table edge; the dealing hand flicks out toward the players.
-          tgt = new THREE.Vector3(-s * 0.17, 0.9, -0.42);
+          const hp = this.hands || { x: 0.17, y: 0.9, z: -0.42 };
+          tgt = new THREE.Vector3(-s * hp.x, hp.y, hp.z);
           const d = this.dealSide === s ? Math.sin(Math.min(1, this.dealing) * Math.PI) : 0;
           tgt.add(new THREE.Vector3(-s * 0.12 * d, -0.02 * d, -0.2 * d));
         } else {
-          const rail = new THREE.Vector3(-s * 0.17, 0.87, -0.43); // model +X (its left) is our -X
+          const hp = this.hands || { x: 0.17, y: 0.87, z: -0.43 };
+          const rail = new THREE.Vector3(-s * hp.x, hp.y, hp.z); // model +X (its left) is our -X
           const lap = new THREE.Vector3(-s * 0.13, 0.66, -0.2);
           tgt = rail.lerp(lap, this.wFold);
         }
@@ -311,6 +320,7 @@ export class PersonRig {
       rot(root, b.Bip01_R_UpperArm, Z, -pump);
     }
 
+    if (this.lite) return;
     // Blink every few seconds. The eyelid bones slide (they don't rotate); a little closed at
     // rest reads as relaxed rather than startled.
     this.nextBlink -= dt;

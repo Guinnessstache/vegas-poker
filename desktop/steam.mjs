@@ -155,6 +155,12 @@ export class Steam {
     return f.inviteToLobby(f.matchmaking(), BigInt(this.lobby.id), BigInt(steamId));
   }
 
+  /** What a "join my table" link needs: steam://joinlobby/<app>/<lobby>/<member>. */
+  inviteInfo() {
+    if (!this.client || !this.lobby) return null;
+    return { appId: this.client.utils.getAppId(), lobbyId: String(this.lobby.id), steamId: this.mySteamId };
+  }
+
   info() {
     if (!this.client) return { ok: false, error: this.error };
     const me = this.client.localplayer;
