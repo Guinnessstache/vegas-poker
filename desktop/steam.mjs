@@ -225,7 +225,11 @@ export class Steam {
     const lobbies = await this.client.matchmaking.getLobbies();
     const me = this.mySteamId;
     return lobbies
-      .map((l) => ({ lobbyId: String(l.id), members: Number(l.getMemberCount()), ...l.getFullData() }))
+      .map((l) => {
+        const d = l.getFullData();
+        // Steam lobby keys are case-insensitive and come back lowercased from a search.
+        return { lobbyId: String(l.id), members: Number(l.getMemberCount()), ...d, hostName: d.hostName ?? d.hostname ?? '' };
+      })
       .filter((t) => t.game === GAME_TAG && t.listed === '1' && t.code)
       .map((t) => ({ ...t, mine: t.host === me }));
   }
