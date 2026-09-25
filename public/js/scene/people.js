@@ -48,6 +48,11 @@ function loadPerson(code) {
         o.castShadow = true;
         o.frustumCulled = false; // posed far from the bind pose; bounds would be wrong
       });
+      // The FBX files carry their own ambient light (and sometimes a camera); every clone would
+      // add another light to the casino and wash the scene out, so keep only the character.
+      const extras = [];
+      obj.traverse((o) => { if (o.isLight || o.isCamera) extras.push(o); });
+      for (const o of extras) o.removeFromParent();
       obj.animations = [];
       resolve(obj);
     }, undefined, reject);
