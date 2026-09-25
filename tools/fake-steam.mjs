@@ -53,6 +53,8 @@ export function startBus(port = 4700) {
       switch (m.op) {
         case 'hello': me = m.id; users.set(me, { sock, name: m.name }); tellUsers(); break;
         case 'create': { const id = String(nextLobby++); lobbies.set(id, { data: m.data, members: new Set([me]) }); reply(lobbyView(id)); break; }
+        case 'list': { reply({ list: [...lobbies].filter(([, l]) => l.data.listed === '1' && l.data.game === m.game).map(([id, l]) => ({ lobbyId: id, members: l.members.size, ...l.data })) }); break; }
+        case 'data': { const l = lobbies.get(m.lobby); if (l && l.data.host === me) Object.assign(l.data, m.data); break; }
         case 'find': { const hit = [...lobbies].find(([, l]) => l.data.code === m.code && l.data.game === m.game); reply({ lobby: hit ? hit[0] : null }); break; }
         case 'join': { const l = lobbies.get(m.lobby); if (l) { l.members.add(me); tellMembers(m.lobby); } reply(lobbyView(m.lobby)); break; }
         case 'leave': leave(me, m.lobby); break;
@@ -107,13 +109,21 @@ export class FakeSteam {
   get mySteamId() { return this.id; }
   onJoinRequest(h) { this.joinHandler = h; }
 
-  async hostTable({ code }) {
-    if (this.isHosting() && this.data.code === code) return this.lobbyId;
+  async hostTable({ code, listed = false }) {
+    if (this.isHosting() && this.data.code === code) { this.updateTable({ listed: listed ? '1' : '0' }); return this.lobbyId; }
     this.leave();
-    const r = await this.req({ op: 'create', data: { code, host: this.id, game: 'fake' } });
+    const r = await this.req({ op: 'create', data: { code, host: this.id, game: 'fake', listed: listed ? '1' : '0', hostName: this.name } });
     Object.assign(this, { lobbyId: r.lobby, data: r.data, members: r.members });
     return r.lobby;
   }
+  updateTable(info) {
+    if (!this.isHosting()) return false;
+    const data = Object.fromEntries(Object.entries(info).map(([k, v]) => [k, String(v)]));
+    Object.assign(this.data, data);
+    write(this.sock, { op: 'data', lobby: this.lobbyId, data });
+    return true;
+  }
+  async listTables() { return (await this.req({ op: 'list', game: 'fake' })).list.map((t) => ({ ...t, mine: t.host === this.id })); }
   async findTable(code) { return (await this.req({ op: 'find', code, game: 'fake' })).lobby; }
   async joinLobby(id) {
     this.leave();

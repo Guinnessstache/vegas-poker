@@ -55,9 +55,12 @@ test('host refuses players who are not in its lobby', async () => {
   const echo = await echoServer();
   const net_ = fakeSteam();
   net_.peers.HOST = new Tunnel({ send: net_.send('HOST'), localPort: echo.address().port, authorize: () => false });
-  net_.peers.STRANGER = new Tunnel({ send: net_.send('STRANGER'), localPort: 1, authorize: () => false });
+  let refused = 0;
+  net_.peers.STRANGER = new Tunnel({ send: net_.send('STRANGER'), localPort: 1, authorize: () => false, onRefused: () => refused++ });
   const port = await net_.peers.STRANGER.connectTo('HOST');
   const out = await roundTrip(port, Buffer.from('let me in'));
   assert.equal(out.length, 0);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(refused, 1, 'guest is told it was refused');
   net_.peers.HOST.close(); net_.peers.STRANGER.close(); net_.stop(); echo.close();
 });

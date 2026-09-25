@@ -306,7 +306,7 @@ export class GameView {
       const m = this.members.get(s.id);
       const color = m ? m.color : i;
       seat.avatar.setPlayer(s.name, color);
-      seat.avatar.setCamOn(!!(m && m.media && m.media.cam));
+      seat.avatar.setCamOn(!!(m && m.media && m.media.cam && !this.hiddenVideo?.has(m.pid)));
       seat.avatar.group.visible = i !== this.mySeat; // we're sitting in our own seat
       seat.avatar.state = s.folded ? 'folded' : seat.avatar.state === 'winner' && t.handOver ? 'winner' : 'idle';
       L.obj.visible = i !== this.mySeat;
@@ -660,7 +660,7 @@ export class GameView {
       const v = seatState ? videoMap.get(seatState.id) : null;
       s.avatar.setVideo(v || null);
       const m = seatState ? this.members.get(seatState.id) : null;
-      s.avatar.setCamOn(!!(m && m.media && m.media.cam));
+      s.avatar.setCamOn(!!(m && m.media && m.media.cam && !this.hiddenVideo?.has(m.pid)));
     }
   }
 

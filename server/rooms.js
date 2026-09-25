@@ -44,6 +44,8 @@ export function normalizeSettings(s = {}) {
     // Keep the table filled with computer players up to this many seated players (0 = off).
     fillBots: clampInt(s.fillBots, 0, MAX_SEATS, 0),
     botLevel: BOT_LEVELS.includes(s.botLevel) ? s.botLevel : 'medium',
+    // Shown in the Steam table browser (the desktop app lists it; the server just remembers it).
+    listed: !!s.listed,
   };
 }
 
@@ -59,6 +61,7 @@ export class Room {
     this.timers = { turn: null, advance: null, next: null, bot: null };
     this.deadline = 0;
     this.chat = [];
+    this.banned = new Set(); // client keys and Steam IDs the host kicked
     this.emptySince = Date.now();
     rooms.set(this.code, this);
   }
@@ -73,7 +76,9 @@ export class Room {
     return null;
   }
 
-  join(socket, key, name) {
+  isBanned(key, steamId) { return this.banned.has(key) || (!!steamId && this.banned.has(`steam:${steamId}`)); }
+
+  join(socket, key, name, steamId) {
     let m = this.members.get(key);
     if (m) {
       // Reconnect.
@@ -94,6 +99,7 @@ export class Room {
         bank: this.settings.startingStack, // chips held while standing
         media: { cam: false, mic: false },
         color: this.members.size % 8,
+        steamId: steamId ? String(steamId).slice(0, 24) : null,
       };
       this.members.set(key, m);
       if (!this.hostKey) this.hostKey = key;
@@ -251,6 +257,31 @@ export class Room {
     while (this.seatedCount() > Math.max(target, 0) && autos().length && guard++ < MAX_SEATS * 2) {
       if (!target || this.seatedCount() > target) this.leave(autos().pop()); else break;
     }
+  }
+
+  // Host removes a player (or bot). Kicked players can't rejoin this table.
+  kick(m, pid) {
+    if (!this.isHost(m)) return 'Only the host can remove players';
+    const target = this.memberByPid(pid);
+    if (!target) return 'That player already left';
+    if (target === m) return 'You can\u2019t remove yourself';
+    if (target.bot) return this.removeBot(target);
+    this.banned.add(target.key);
+    if (target.steamId) this.banned.add(`steam:${target.steamId}`);
+    this.toSocket(target, 'kicked', {});
+    const sock = target.socketId && this.io.sockets.sockets.get(target.socketId);
+    this.leave(target);
+    this.systemChat(`${target.name} was removed by the host.`);
+    if (sock) setTimeout(() => sock.disconnect(true), 300);
+    return null;
+  }
+
+  setListed(m, on) {
+    if (!this.isHost(m)) return 'Only the host can change this';
+    this.settings = { ...this.settings, listed: !!on };
+    this.systemChat(on ? 'This table is now listed in Browse tables.' : 'This table is no longer listed publicly.');
+    this.broadcastRoom();
+    return null;
   }
 
   hostAddBot(m, level) {
@@ -500,6 +531,7 @@ export class Room {
     // Starting stack only affects new buy-ins / rebuys. Bot settings have their own control.
     next.fillBots = this.settings.fillBots;
     next.botLevel = this.settings.botLevel;
+    next.listed = this.settings.listed;
     this.settings = next;
     this.systemChat(`Blinds are now ${next.smallBlind.toLocaleString()}/${next.bigBlind.toLocaleString()} (from next hand).`);
     this.broadcastRoom();

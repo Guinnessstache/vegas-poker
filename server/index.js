@@ -17,7 +17,8 @@ const THREE_DIR = [path.join(root, 'node_modules/three'), process.resourcesPath 
 
 // Build the HTTP + Socket.IO game server. Used standalone (`npm start`, Render, Docker)
 // and embedded inside the desktop/Steam app.
-export function createGameServer() {
+// relay: { port, username, credential } of the desktop app's webcam relay (TURN), if any.
+export function createGameServer({ relay } = {}) {
   const app = express();
   app.disable('x-powered-by');
 
@@ -44,7 +45,9 @@ export function createGameServer() {
         credential: process.env.TURN_CREDENTIAL || '',
       });
     }
-    res.json({ iceServers });
+    // The desktop app runs a webcam relay; players build its address themselves (guests reach it
+    // through their own Steam tunnel port), so only the credentials are shared here.
+    res.json(relay ? { iceServers, relay } : { iceServers });
   });
 
   app.get('/api/room/:code', (req, res) => {
@@ -67,11 +70,11 @@ export function createGameServer() {
       try { reply(cb, fn(...args)); } catch (e) { console.error(e); reply(cb, 'Server error'); }
     };
 
-    const enter = (r, { name, key }, cb) => {
+    const enter = (r, { name, key, steamId }, cb) => {
       if (typeof key !== 'string' || key.length < 16 || key.length > 64) return reply(cb, 'Bad client key');
       if (room && room !== r && member) room.leave(member);
       room = r;
-      member = r.join(socket, key, name);
+      member = r.join(socket, key, name, typeof steamId === 'string' ? steamId : null);
       reply(cb, null, { code: r.code, pid: member.pid });
     };
 
@@ -84,6 +87,7 @@ export function createGameServer() {
       const r = rooms.get(String(data.code || '').toUpperCase().trim());
       if (!r) return reply(cb, 'No table with that code. Check the code and try again.');
       if (r.members.size >= 16 && !r.members.has(data.key)) return reply(cb, 'That table is full.');
+      if (r.isBanned(data.key, data.steamId)) return reply(cb, 'The host removed you from this table.');
       enter(r, data, cb);
     });
 
@@ -95,6 +99,13 @@ export function createGameServer() {
     socket.on('rebuy', guard(() => room.rebuy(member)));
     socket.on('sitout', guard((d) => room.setSittingOut(member, d?.value)));
     socket.on('settings', guard((d) => room.updateSettings(member, d || {})));
+    socket.on('kick', (d = {}, cb) => {
+      if (!room || !member) return reply(cb, 'Not in a room');
+      const target = room.memberByPid(String(d.pid || ''));
+      const steamId = target?.steamId || null;
+      try { reply(cb, room.kick(member, String(d.pid || '')), { steamId }); } catch (e) { console.error(e); reply(cb, 'Server error'); }
+    });
+    socket.on('listed', guard((d) => room.setListed(member, !!d?.on)));
     socket.on('addBot', guard((d) => room.hostAddBot(member, String(d?.level || 'medium'))));
     socket.on('removeBot', guard((d) => room.hostRemoveBot(member, String(d?.pid || ''))));
     socket.on('botFill', guard((d) => room.hostBotFill(member, Number(d?.count) || 0, String(d?.level || 'medium'))));
@@ -116,8 +127,8 @@ export function createGameServer() {
 }
 
 // Start listening. port 0 = pick a free port. Resolves with the actual port.
-export function startServer({ port = Number(process.env.PORT) || 3000, host, quiet = false } = {}) {
-  const { server, io } = createGameServer();
+export function startServer({ port = Number(process.env.PORT) || 3000, host, quiet = false, relay } = {}) {
+  const { server, io } = createGameServer({ relay });
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, host, () => {

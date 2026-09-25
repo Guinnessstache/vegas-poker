@@ -9,6 +9,7 @@ export class MediaManager {
     this.peers = new Map(); // pid -> { pc, polite, makingOffer, ignoreOffer, stream, video, analyser }
     this.local = null;
     this.iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+    this.forceRelay = !!opts.forceRelay;
     this.onRemoteVideo = onRemoteVideo;
     this.onRemoteGone = onRemoteGone;
     this.onLevel = onLevel;
@@ -19,7 +20,10 @@ export class MediaManager {
     this.videoHost = document.createElement('div');
     this.videoHost.className = 'video-host';
     document.body.appendChild(this.videoHost);
-    fetch(opts.iceUrl || '/api/ice').then((r) => r.json()).then((j) => { if (j.iceServers) this.iceServers = j.iceServers; }).catch(() => {});
+    fetch(opts.iceUrl || '/api/ice').then((r) => r.json())
+      .then((j) => (opts.buildIce ? opts.buildIce(j) : j.iceServers))
+      .then((list) => { if (list?.length) this.iceServers = list; })
+      .catch(() => {});
 
     socket.on('rtc', ({ from, data }) => this.onSignal(from, data));
     socket.on('peerLeft', ({ pid }) => this.closePeer(pid));
@@ -36,6 +40,17 @@ export class MediaManager {
     return this.audioCtx;
   }
 
+  // Mute or hide one player just for this viewer.
+  setBlocked(pid, { muted, hidden } = {}) {
+    this.muted ||= new Set(); this.hidden ||= new Set();
+    if (muted !== undefined) { if (muted) this.muted.add(pid); else this.muted.delete(pid); }
+    if (hidden !== undefined) { if (hidden) this.hidden.add(pid); else this.hidden.delete(pid); }
+    const p = this.peers.get(pid);
+    if (p?.video) p.video.muted = this.muted.has(pid);
+  }
+  isMuted(pid) { return !!this.muted?.has(pid); }
+  isHidden(pid) { return !!this.hidden?.has(pid); }
+
   // Keep a connection with every other connected member.
   syncMembers(members) {
     const want = new Set(members.filter((m) => m.connected && !m.bot && m.pid !== this.myPid).map((m) => m.pid));
@@ -44,7 +59,8 @@ export class MediaManager {
   }
 
   createPeer(pid) {
-    const pc = new RTCPeerConnection({ iceServers: this.iceServers });
+    // Debug switch: localStorage hr_force_relay=1 sends all video through the relay.
+    const pc = new RTCPeerConnection({ iceServers: this.iceServers, iceTransportPolicy: this.forceRelay ? 'relay' : 'all' });
     const peer = { pid, pc, polite: this.myPid < pid, makingOffer: false, ignoreOffer: false, stream: null, video: null, analyser: null };
     this.peers.set(pid, peer);
 
@@ -67,6 +83,7 @@ export class MediaManager {
         peer.video = v;
       }
       if (peer.video.srcObject !== stream) peer.video.srcObject = stream;
+      peer.video.muted = this.isMuted(pid);
       peer.stream = stream;
       peer.video.play().catch(() => { /* autoplay blocked until user gesture */ });
       if (track.kind === 'audio') this.attachAnalyser(peer, stream);
@@ -208,7 +225,7 @@ export class MediaManager {
 
   videoMap() {
     const m = new Map();
-    for (const p of this.peers.values()) if (p.video) m.set(p.pid, p.video);
+    for (const p of this.peers.values()) if (p.video && !this.isHidden(p.pid)) m.set(p.pid, p.video);
     return m;
   }
 

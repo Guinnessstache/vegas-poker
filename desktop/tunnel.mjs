@@ -8,7 +8,7 @@
 // Frame: [type u8][connection id u32 BE][payload]
 import net from 'node:net';
 
-const T = { OPEN: 1, DATA_TO_HOST: 2, DATA_TO_GUEST: 3, CLOSE_TO_HOST: 4, CLOSE_TO_GUEST: 5, PING: 6, PONG: 7 };
+const T = { OPEN: 1, DATA_TO_HOST: 2, DATA_TO_GUEST: 3, CLOSE_TO_HOST: 4, CLOSE_TO_GUEST: 5, PING: 6, PONG: 7, REFUSED: 8 };
 const CHUNK = 32 * 1024;
 const PING_EVERY = 2000;
 const HOST_TIMEOUT = 20000; // guest gives up on a host it hasn't heard from at all
@@ -30,16 +30,20 @@ export class Tunnel {
   /**
    * @param {object} o
    * @param {(peer: string, buf: Buffer) => boolean} o.send  deliver one reliable, ordered packet
-   * @param {number} o.localPort                            the host's own game server port
+   * @param {number} o.localPort                            the host's own game server port (service 0)
+   * @param {Record<number, number>} [o.services]           extra local ports by service number (1 = webcam relay)
    * @param {(peer: string) => boolean} o.authorize          may this peer use our server?
    * @param {(peer: string) => void} [o.onHostLost]          the host we joined went away
+   * @param {(peer: string) => void} [o.onRefused]           the host won't let us in (e.g. we were removed)
    * @param {(...a: any[]) => void} [o.log]
    */
-  constructor({ send, localPort, authorize, onHostLost, log }) {
+  constructor({ send, localPort, services, authorize, onHostLost, onRefused, log }) {
     this.sendRaw = send;
     this.localPort = localPort;
+    this.services = { ...(services || {}) };
     this.authorize = authorize;
     this.onHostLost = onHostLost || (() => {});
+    this.onRefused = onRefused || (() => {});
     this.log = log || (() => {});
     this.conns = new Map(); // key -> { sock, pending?: Buffer[] }
     this.queues = new Map(); // peer -> { items: Buffer[], bytes }
@@ -92,7 +96,7 @@ export class Tunnel {
     const id = buf.readUInt32BE(1);
     const payload = buf.subarray(5);
     switch (type) {
-      case T.OPEN: this.seen.set(peer, Date.now()); this.accept(peer, id); break;
+      case T.OPEN: this.seen.set(peer, Date.now()); this.accept(peer, id, payload.length ? payload.readUInt8(0) : 0); break;
       case T.DATA_TO_HOST: {
         this.seen.set(peer, Date.now());
         const c = this.conns.get(`h:${peer}:${id}`);
@@ -121,12 +125,13 @@ export class Tunnel {
       }
       case T.PING: this.seen.set(peer, Date.now()); this.out(peer, T.PONG, 0); break;
       case T.PONG: if (this.client?.peer === peer) this.client.lastPong = Date.now(); break;
+      case T.REFUSED: if (this.client?.peer === peer) { this.closeClient(); this.onRefused(peer); } break;
       default: break;
     }
   }
 
   // ---------- host side ----------
-  async accept(peer, id) {
+  async accept(peer, id, service = 0) {
     const key = `h:${peer}:${id}`;
     const entry = { sock: null, pending: [] };
     this.conns.set(key, entry);
@@ -138,13 +143,16 @@ export class Tunnel {
       if (this.conns.get(key) !== entry) return; // closed while waiting
     }
     if (!ok) {
-      this.log('[tunnel] refused connection from', peer, '(not in our lobby)');
+      this.log('[tunnel] refused connection from', peer);
       this.conns.delete(key);
       this.out(peer, T.CLOSE_TO_GUEST, id);
+      this.out(peer, T.REFUSED, id);
       return;
     }
     if (!this.seenOpen?.has(peer)) { (this.seenOpen ||= new Set()).add(peer); this.log('[tunnel] guest connected', peer); }
-    const sock = net.connect(this.localPort, '127.0.0.1');
+    const target = service === 0 ? this.localPort : this.services[service];
+    if (!target) { this.conns.delete(key); this.out(peer, T.CLOSE_TO_GUEST, id); return; }
+    const sock = net.connect(target, '127.0.0.1');
     sock.setNoDelay(true);
     entry.sock = sock;
     for (const b of entry.pending) sock.write(b);
@@ -157,24 +165,29 @@ export class Tunnel {
   }
 
   // ---------- guest side ----------
-  /** Start forwarding a local port to `peer`'s game server. Resolves with the port. */
+  /** Start forwarding local ports to `peer`'s game server (and its webcam relay). Resolves with the game port. */
   async connectTo(peer) {
     this.closeClient();
-    const server = net.createServer((sock) => {
-      const id = this.nextId++;
-      const key = `g:${peer}:${id}`;
-      const entry = { sock };
-      sock.setNoDelay(true);
-      this.conns.set(key, entry);
-      this.out(peer, T.OPEN, id);
-      sock.on('data', (d) => this.pipe(peer, T.DATA_TO_HOST, id, d));
-      sock.on('error', () => sock.destroy());
-      sock.on('close', () => {
-        if (this.conns.get(key) === entry) { this.conns.delete(key); this.out(peer, T.CLOSE_TO_HOST, id); }
+    const listen = async (service) => {
+      const server = net.createServer((sock) => {
+        const id = this.nextId++;
+        const key = `g:${peer}:${id}`;
+        const entry = { sock };
+        sock.setNoDelay(true);
+        this.conns.set(key, entry);
+        this.out(peer, T.OPEN, id, Buffer.from([service]));
+        sock.on('data', (d) => this.pipe(peer, T.DATA_TO_HOST, id, d));
+        sock.on('error', () => sock.destroy());
+        sock.on('close', () => {
+          if (this.conns.get(key) === entry) { this.conns.delete(key); this.out(peer, T.CLOSE_TO_HOST, id); }
+        });
       });
-    });
-    await new Promise((res, rej) => { server.once('error', rej); server.listen(0, '127.0.0.1', res); });
-    const client = { peer, server, port: server.address().port, lastPong: Date.now() };
+      await new Promise((res, rej) => { server.once('error', rej); server.listen(0, '127.0.0.1', res); });
+      return server;
+    };
+    const server = await listen(0);
+    const relay = await listen(1);
+    const client = { peer, server, relay, port: server.address().port, relayPort: relay.address().port, lastPong: Date.now() };
     client.timer = setInterval(() => {
       this.out(peer, T.PING, 0);
       if (Date.now() - client.lastPong > HOST_TIMEOUT) {
@@ -190,6 +203,7 @@ export class Tunnel {
   }
 
   get clientPeer() { return this.client?.peer || null; }
+  get clientRelayPort() { return this.client?.relayPort || null; }
 
   closeClient() {
     const c = this.client;
@@ -197,6 +211,7 @@ export class Tunnel {
     this.client = null;
     clearInterval(c.timer);
     c.server.close();
+    c.relay?.close();
     for (const [key, e] of this.conns) {
       if (key.startsWith(`g:${c.peer}:`)) { this.conns.delete(key); e.sock.destroy(); }
     }

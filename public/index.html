@@ -74,6 +74,7 @@
               </select>
             </label>
           </div>
+          <label class="chk list-row hidden" id="list-row"><input type="checkbox" id="set-listed" /> List publicly <span class="hint-inline">— anyone can find it in Browse tables</span></label>
           <button id="create-btn" class="btn gold big">Create table</button>
           <div class="solo-row">
             <button id="solo-btn" class="btn ghost big" type="button">Play vs bots</button>
@@ -90,6 +91,7 @@
             <input id="code-input" class="code-input" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false" />
           </label>
           <button id="join-btn" class="btn green big">Join table</button>
+          <button id="browse-btn" class="btn ghost big hidden" type="button">Browse open tables</button>
           <p class="hint">Got an invite link? It fills the code in for you.</p>
         </div>
       </div>
@@ -106,6 +108,7 @@
         <span class="lbl">Table</span><span id="room-code">-----</span>
         <button id="copy-link" class="btn small">Copy<span class="lbl-long"> invite</span></button>
         <button id="steam-invite" class="btn small gold hidden" title="Invite Steam friends">Invite<span class="lbl-long"> Steam friends</span></button>
+        <button id="players-btn" class="btn small" title="Players at this table: mute, hide camera, remove">Players</button>
       </div>
       <div id="status-line" class="status-line"></div>
       <div id="host-controls" class="host-controls hidden">
@@ -271,6 +274,25 @@
       <p id="ach-summary" class="hint"></p>
       <div id="ach-list" class="ach-list"></div>
       <div class="dlg-btns"><button value="ok" class="btn gold small">Close</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="browse-dialog">
+    <form method="dialog">
+      <h3>Open tables</h3>
+      <p id="browse-status" class="hint"></p>
+      <div id="browse-list" class="browse-list"></div>
+      <div class="dlg-btns"><button type="button" id="browse-refresh" class="btn small">Refresh</button><button value="ok" class="btn gold small">Close</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="players-dialog">
+    <form method="dialog">
+      <h3>Players</h3>
+      <p class="hint">Mute or hide someone just for you. The host can remove players.</p>
+      <label class="chk hidden" id="listed-row"><input type="checkbox" id="listed-toggle" /> List this table in Browse tables</label>
+      <div id="players-list" class="players-list"></div>
+      <div class="dlg-btns"><button value="ok" class="btn gold small">Done</button></div>
     </form>
   </dialog>
 

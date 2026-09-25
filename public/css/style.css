@@ -376,3 +376,21 @@ body.pad.my-turn .pad-hints:not(:empty) { display: flex; }
 .osk-key.osk-focus { background: var(--gold); color: #1a0f09; }
 .osk-help { margin-top: 8px; font-size: 12px; color: var(--muted); }
 .osk-help b { color: var(--ink); }
+
+/* ---------- table browser / players ---------- */
+.list-row { margin-top: 12px; font-size: 14px; }
+.hint-inline { color: var(--muted); font-size: 12px; }
+#browse-dialog { width: min(640px, 94vw); }
+.browse-list, .players-list { display: flex; flex-direction: column; gap: 6px; max-height: min(58vh, 520px); overflow-y: auto; margin-top: 8px; }
+.table-row, .player-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid transparent; }
+.table-row.mine { border-color: var(--line); }
+.table-row .tr-main { flex: 1; min-width: 0; }
+.tr-title { font-weight: 700; }
+.tr-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.tr-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(61,220,132,.15); color: #7dffb0; white-space: nowrap; }
+.tr-status.waiting { background: rgba(232,192,96,.15); color: var(--gold); }
+.browse-empty { color: var(--muted); padding: 18px; text-align: center; line-height: 1.5; }
+#players-dialog { width: min(560px, 94vw); }
+.player-row .pr-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-row .pr-tags { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.player-row .btn.on { background: rgba(216,67,79,.25); border-color: #d8434f; }

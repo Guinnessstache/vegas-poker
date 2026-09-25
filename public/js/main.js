@@ -86,9 +86,21 @@ const socketOpts = { transports: ['websocket', 'polling'] };
 const socket = SERVER ? io(SERVER, socketOpts) : io(socketOpts);
 const media = new MediaManager(socket, {
   iceUrl: `${SERVER}/api/ice`,
-  onRemoteVideo: (pid, video) => { view.setVideoForPid(pid, video); renderTiles(); },
+  forceRelay: local.get('hr_force_relay') === '1',
+  // Desktop: add the host's webcam relay as a fallback for players who can't connect directly.
+  // The host reaches it locally; guests go through their own Steam tunnel port.
+  buildIce: async (j) => {
+    const list = [...(j.iceServers || [])];
+    if (j.relay && desktop) {
+      const port = VIA_STEAM ? await desktop.relayPort?.().catch(() => null) : j.relay.port;
+      if (port) list.push({ urls: `turn:127.0.0.1:${port}?transport=tcp`, username: j.relay.username, credential: j.relay.credential });
+    }
+    return list;
+  },
+  onRemoteVideo: (pid, video) => { view.setVideoForPid(pid, media.isHidden(pid) ? null : video); renderTiles(); },
   onRemoteGone: (pid) => { view.setVideoForPid(pid, null); renderTiles(); },
   onLevel: (pid, level) => {
+    if (media.isMuted?.(pid)) level = 0;
     view.setSpeaking(pid, level);
     if (pid === app.pid) $('self-level').style.width = `${Math.round(level * 100)}%`;
   },
@@ -150,8 +162,9 @@ $('create-btn').addEventListener('click', async () => {
   if (!name) return;
   unlockAudio();
   const res = await whileBusy($('create-btn'), 'Creating table…', () => emit('create', {
-    name, key: clientKey,
+    name, key: clientKey, steamId: app.steam?.steamId,
     settings: {
+      listed: HOSTING_HERE && $('set-listed').checked,
       startingStack: Number($('set-stack').value),
       bigBlind: Number($('set-blinds').value),
       actionTime: Number($('set-timer').value),
@@ -224,7 +237,7 @@ async function joinTable(code) {
   // Desktop: a code that isn't one of this PC's own tables is looked up on Steam.
   if (HOSTING_HERE) {
     const res = await whileBusy(btn, 'Finding table…', async () => {
-      const mine = await emitQuiet('join', { code, name, key: clientKey });
+      const mine = await emitQuiet('join', { code, name, key: clientKey, steamId: app.steam?.steamId });
       if (mine.ok || !app.steam?.ok) return mine;
       btn.textContent = 'Finding table on Steam…';
       const target = await desktop.findTable(code);
@@ -239,7 +252,7 @@ async function joinTable(code) {
     }
     return;
   }
-  const res = await whileBusy(btn, 'Joining…', () => emit('join', { code, name, key: clientKey }));
+  const res = await whileBusy(btn, 'Joining…', () => emit('join', { code, name, key: clientKey, steamId: app.steam?.steamId }));
   if (res.ok) enterGame(res);
   else {
     $('lobby-error').textContent = res.error || 'Could not join';
@@ -268,8 +281,8 @@ document.addEventListener('pointerdown', () => media.unlockPlayback(), { passive
 
 // ---------------- socket ----------------
 socket.on('connect', () => {
-  if (app.code) socket.emit('join', { code: app.code, key: clientKey, name: local.get('hr_name') }, (res) => {
-    if (!res?.ok) { toast('That table has closed.'); leaveToLobby(); }
+  if (app.code) socket.emit('join', { code: app.code, key: clientKey, name: local.get('hr_name'), steamId: app.steam?.steamId }, (res) => {
+    if (!res?.ok) { session.set('hr_notice', res?.error || 'That table has closed.'); leaveToLobby(); }
   });
 });
 socket.on('disconnect', () => toast('Connection lost — reconnecting…'));
@@ -314,6 +327,8 @@ socket.on('room', (room) => {
   view.setRoom(room, app.pid);
   media.syncMembers(room.members);
   if ($('bots-dialog').open) renderBotsDialog();
+  if ($('players-dialog').open) renderPlayers();
+  publishTable();
   view.rebindVideos(media.videoMap());
   updateHUD();
   renderTiles();
@@ -867,6 +882,115 @@ for (const id of ['ach-btn', 'lobby-ach-btn']) {
   $(id).addEventListener('click', () => { $('menu')?.classList.add('hidden'); renderAchievements(); $('ach-dialog').showModal(); });
 }
 
+// ---------------- players panel: mute / hide camera / remove ----------------
+const kickArmed = new Map();
+let playersSig = '';
+function renderPlayers(force = false) {
+  const room = app.room;
+  if (!room) return;
+  const amHost = room.hostPid === app.pid;
+  // Only rebuild when something shown here changed (keeps clicks and the controller highlight steady).
+  const sig = JSON.stringify([room.hostPid, room.settings.listed, amHost, room.members.map((m) => [m.pid, m.name, m.bot, m.connected, m.media?.cam, m.media?.mic, media.isMuted(m.pid), media.isHidden(m.pid), kickArmed.get(m.pid) > Date.now()])]);
+  if (!force && sig === playersSig) return;
+  playersSig = sig;
+  const focusKey = nav.current?.dataset?.key;
+  $('listed-row').classList.toggle('hidden', !(amHost && HOSTING_HERE && app.steam?.ok));
+  $('listed-toggle').checked = !!room.settings.listed;
+  const list = $('players-list');
+  list.textContent = '';
+  const others = room.members.filter((m) => m.pid !== app.pid);
+  if (!others.length) { const e = document.createElement('div'); e.className = 'browse-empty'; e.textContent = 'Nobody else is here yet.'; list.append(e); }
+  for (const m of others) {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    const nm = document.createElement('div'); nm.className = 'pr-name';
+    nm.textContent = m.bot ? `\u{1F916} ${m.name}` : m.name;
+    const tags = document.createElement('span'); tags.className = 'pr-tags';
+    tags.textContent = [m.pid === room.hostPid ? 'host' : '', m.bot ? `${m.bot} bot` : '', m.media?.cam ? 'camera on' : '', m.media?.mic ? 'mic on' : '', m.connected ? '' : 'offline'].filter(Boolean).join(' · ');
+    nm.append(tags);
+    row.append(nm);
+    const mk = (label, on, fn, key) => { const b = document.createElement('button'); b.type = 'button'; b.className = `btn small ghost${on ? ' on' : ''}`; b.textContent = label; b.dataset.key = `${m.pid}:${key}`; b.addEventListener('click', fn); row.append(b); return b; };
+    if (!m.bot) {
+      const muted = media.isMuted(m.pid);
+      mk(muted ? 'Unmute' : 'Mute', muted, () => { media.setBlocked(m.pid, { muted: !muted }); renderPlayers(); }, 'mute');
+      const hidden = media.isHidden(m.pid);
+      mk(hidden ? 'Show camera' : 'Hide camera', hidden, () => {
+        media.setBlocked(m.pid, { hidden: !hidden });
+        view.hiddenVideo ||= new Set();
+        if (!hidden) view.hiddenVideo.add(m.pid); else view.hiddenVideo.delete(m.pid);
+        view.rebindVideos(media.videoMap());
+        renderTiles();
+        renderPlayers();
+      }, 'cam');
+    }
+    if (amHost) {
+      const armed = kickArmed.get(m.pid) > Date.now();
+      mk(m.bot ? 'Remove' : armed ? 'Confirm remove' : 'Remove', armed, async () => {
+        if (!m.bot && !(kickArmed.get(m.pid) > Date.now())) { kickArmed.set(m.pid, Date.now() + 6000); renderPlayers(); setTimeout(() => $("players-dialog").open && renderPlayers(), 6100); return; }
+        kickArmed.delete(m.pid);
+        const res = await emit('kick', { pid: m.pid });
+        if (res.ok && res.steamId) desktop?.banPeer?.(res.steamId);
+      }, 'kick');
+    }
+    list.append(row);
+  }
+  if (focusKey && padStyle) { const el = list.querySelector(`[data-key="${focusKey}"]`); if (el) nav.focus(el); }
+}
+$('players-btn').addEventListener('click', () => { renderPlayers(true); $('players-dialog').showModal(); });
+$('listed-toggle').addEventListener('change', async (e) => {
+  const on = e.target.checked;
+  const res = await emit('listed', { on });
+  if (res.ok && app.code) { desktop?.hostTable?.(app.code, on); publishTable(true); }
+});
+socket.on('kicked', () => {
+  session.set('hr_notice', 'The host removed you from that table.');
+  session.del('hr_room');
+  setTimeout(() => leaveToLobby(), 200);
+});
+
+// ---------------- table browser (Steam) ----------------
+async function refreshBrowser() {
+  const list = $('browse-list');
+  $('browse-status').textContent = 'Looking for open tables on Steam…';
+  list.textContent = '';
+  const res = await desktop.listTables().catch(() => ({ ok: false, tables: [] }));
+  const tables = (res.tables || []).map((t) => ({ ...t, humans: +t.humans || 0, bots: +t.bots || 0, seated: +t.seated || 0, seats: +t.seats || 8 }));
+  tables.sort((a, b) => b.humans - a.humans || (b.seats - b.seated > 0) - (a.seats - a.seated > 0) || b.seated - a.seated);
+  $('browse-status').textContent = !res.ok ? 'Couldn\u2019t reach Steam. Is it running?' : tables.length ? `${tables.length} open table${tables.length === 1 ? '' : 's'}` : '';
+  if (!tables.length) {
+    const e = document.createElement('div');
+    e.className = 'browse-empty';
+    e.innerHTML = 'No open tables right now.<br>Create one with <b>List publicly</b> ticked and others can find you here — or play vs bots while you wait.';
+    list.append(e);
+    return;
+  }
+  for (const t of tables) {
+    const row = document.createElement('div');
+    row.className = `table-row${t.mine ? ' mine' : ''}`;
+    const main = document.createElement('div'); main.className = 'tr-main';
+    const title = document.createElement('div'); title.className = 'tr-title'; title.textContent = `${t.hostName || 'Someone'}\u2019s table${t.mine ? ' (yours)' : ''}`;
+    const open = Math.max(0, t.seats - t.seated);
+    const sub = document.createElement('div'); sub.className = 'tr-sub';
+    sub.textContent = `${t.humans} player${t.humans === 1 ? '' : 's'}${t.bots ? ` + ${t.bots} bot${t.bots === 1 ? '' : 's'}` : ''} · ${open} seat${open === 1 ? '' : 's'} open · Blinds ${fmt(+t.sb || 0)}/${fmt(+t.bb || 0)} · ${fmt(+t.stack || 0)} stack${t.rebuy === '1' ? ' · rebuys' : ' · freezeout'}`;
+    main.append(title, sub);
+    const st = document.createElement('span'); st.className = `tr-status${t.running === '1' ? '' : ' waiting'}`; st.textContent = t.running === '1' ? 'Playing' : 'Waiting';
+    const join = document.createElement('button'); join.type = 'button'; join.className = 'btn small green'; join.textContent = 'Join';
+    join.disabled = !!t.mine;
+    join.addEventListener('click', async () => {
+      if (!getName()) { $('browse-dialog').close(); return; }
+      join.disabled = true; join.textContent = 'Joining…';
+      const target = await desktop.joinLobby(t.lobbyId).catch(() => ({ error: 'Could not join that table.' }));
+      if (target?.server) { $('browse-dialog').close(); goToRemoteTable(target); return; }
+      join.disabled = false; join.textContent = 'Join';
+      $('browse-status').textContent = target?.error || 'Could not join that table.';
+    });
+    row.append(main, st, join);
+    list.append(row);
+  }
+}
+$('browse-btn').addEventListener('click', () => { $('browse-dialog').showModal(); refreshBrowser(); });
+$('browse-refresh').addEventListener('click', refreshBrowser);
+
 // ---------------- controller (gamepad) ----------------
 // A call/check · hold X fold · Y bet/raise · LB/RB bet size · LT ½ pot · RT pot (twice = all-in)
 // D-pad / left stick: move between buttons · B back · ☰ menu · ⧉ camera · right stick: look around
@@ -1024,7 +1148,36 @@ window.__poker = { app, world, view, media, socket };
 // Tables created in the app are hosted by this PC; a Steam lobby tells friends how to reach it.
 function hostSteamLobby(code) {
   if (!HOSTING_HERE || !app.steam?.ok) return;
-  desktop.hostTable(code).catch(() => {});
+  const listed = app.room?.settings?.listed ?? $('set-listed').checked;
+  desktop.hostTable(code, listed).then(() => publishTable(true)).catch(() => {});
+}
+
+// Keep this table's details in its Steam lobby current, for the table browser.
+let lastPublished = '';
+let publishTimer = null;
+function publishTable(now = false) {
+  if (!HOSTING_HERE || !app.steam?.ok || !app.code || !app.room) return;
+  clearTimeout(publishTimer);
+  publishTimer = setTimeout(() => {
+    const room = app.room; const t = app.state?.table;
+    const members = room.members;
+    const info = {
+      hostName: (members.find((m) => m.pid === room.hostPid)?.name || app.steam.name || 'Host'),
+      humans: members.filter((m) => !m.bot && m.connected).length,
+      bots: members.filter((m) => m.bot).length,
+      seated: t ? t.seats.filter(Boolean).length : members.filter((m) => m.seat >= 0).length,
+      seats: 8,
+      sb: room.settings.smallBlind, bb: room.settings.bigBlind,
+      stack: room.settings.startingStack,
+      rebuy: room.settings.allowRebuy ? 1 : 0,
+      running: room.running ? 1 : 0,
+      listed: room.settings.listed ? 1 : 0,
+    };
+    const key = JSON.stringify(info);
+    if (key === lastPublished) return;
+    lastPublished = key;
+    desktop.updateTable(info).catch(() => {});
+  }, now ? 0 : 1500);
 }
 
 function goToRemoteTable({ code, server }) {
@@ -1040,6 +1193,8 @@ if (desktop) {
     if (!info?.ok) return;
     if (!$('name-input').value.trim()) $('name-input').value = String(info.name || '').slice(0, 16);
     $('steam-invite').classList.remove('hidden');
+    $('browse-btn').classList.remove('hidden');
+    $('list-row').classList.remove('hidden');
     for (const id of achUnlocked) desktop.unlockAchievement?.(id); // carry over progress made before Steam
     if (info.deck) {
       // Steam Deck: full screen and a slightly larger interface by default.
@@ -1069,6 +1224,11 @@ if (desktop) {
       session.set('hr_notice', 'Couldn\u2019t reach the host through Steam. They may have left, or a network is blocking the connection. \u201cOpen log file\u201d below has the details.');
       location.href = location.pathname;
     }
+  });
+  desktop.onRefused?.(() => {
+    session.del('hr_room');
+    session.set('hr_notice', 'You can\u2019t join that table — the host removed you.');
+    location.href = location.pathname;
   });
   desktop.onNotice((msg) => {
     if (app.code) toast(msg, 5000); else $('lobby-error').textContent = msg;

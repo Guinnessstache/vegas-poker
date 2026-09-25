@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path';
 import { Steam, enableOverlay, restartThroughSteamIfNeeded } from './steam.mjs';
 import { Tunnel } from './tunnel.mjs';
+import { startTurnServer } from '../server/turn.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
@@ -24,6 +25,8 @@ if (process.env.HR_USER_DATA) app.setPath('userData', process.env.HR_USER_DATA);
 if (restartThroughSteamIfNeeded(APP_ID)) app.exit(0);
 enableOverlay();
 if (process.env.HR_NO_SANDBOX) app.commandLine.appendSwitch('no-sandbox');
+// Development only: fake camera/mic for automated tests.
+if (process.env.HR_FAKE_MEDIA) { app.commandLine.appendSwitch('use-fake-device-for-media-stream'); app.commandLine.appendSwitch('use-fake-ui-for-media-stream'); }
 
 // One running copy; a second launch (e.g. accepting an invite) is forwarded here.
 if (!app.requestSingleInstanceLock()) app.exit(0);
@@ -52,6 +55,8 @@ let win = null;
 let steam = null;
 let localServer = null;
 let tunnel = null;
+let relay = null; // webcam relay (TURN) for players who can't connect directly
+const bannedPeers = new Set(); // Steam IDs the host kicked from their table
 let pendingJoin = null; // { code, server, via } waiting for the renderer
 
 function lobbyFromArgs(argv) {
@@ -85,14 +90,22 @@ async function joinSteamLobby(lobbyId) {
 
 async function createWindow() {
   const { startServer } = await import('../server/index.js');
-  localServer = await startServer({ port: 0, host: '127.0.0.1', quiet: true });
+  try { relay = await startTurnServer({ log: (...a) => console.log(...a) }); } catch (e) { console.warn('[turn] relay failed to start', e); }
+  localServer = await startServer({ port: 0, host: '127.0.0.1', quiet: true,
+    relay: relay && { port: relay.port, username: relay.username, credential: relay.credential } });
   const localUrl = `http://127.0.0.1:${localServer.port}`;
 
   // Carries friends' game traffic to our server (when hosting) or ours to theirs (when joining).
   tunnel = new Tunnel({
     send: (peer, buf) => steam.sendPacket(peer, buf),
     localPort: localServer.port,
-    authorize: (peer) => steam.isHosting() && steam.isLobbyMember(peer),
+    services: relay ? { 1: relay.port } : {},
+    authorize: (peer) => steam.isHosting() && steam.isLobbyMember(peer) && !bannedPeers.has(peer),
+    onRefused: (peer) => {
+      console.warn('[tunnel] host refused us', peer);
+      steam.leave();
+      win?.webContents.send('hr:refused');
+    },
     onHostLost: (peer) => {
       console.warn('[tunnel] lost the host', peer, 'status', steam.peerStatus?.(peer));
       steam.leave();
@@ -157,16 +170,30 @@ async function createWindow() {
 
 // ---------- IPC for the renderer (see preload.cjs) ----------
 ipcMain.handle('hr:steam-info', () => ({ ...(steam?.info() ?? { ok: false }), overlay: LAUNCHED_BY_STEAM }));
-ipcMain.handle('hr:host-table', async (_e, { code }) => {
+ipcMain.handle('hr:host-table', async (_e, { code, listed }) => {
   try {
     if (tunnel?.clientPeer) return { ok: false, error: 'not the host' };
-    const id = await steam?.hostTable({ code });
+    const id = await steam?.hostTable({ code, listed: !!listed });
     console.log('[steam] lobby for table', code, '=>', id);
     return { ok: !!id, lobbyId: id };
   } catch (e) {
     console.warn('[steam] createLobby failed', e);
     return { ok: false, error: String(e?.message || e) };
   }
+});
+ipcMain.handle('hr:update-table', (_e, info) => steam?.updateTable?.(info) ?? false);
+ipcMain.handle('hr:list-tables', async () => {
+  try { return { ok: true, tables: (await steam?.listTables?.()) || [] }; } catch (e) { console.warn('[steam] list tables failed', e); return { ok: false, tables: [] }; }
+});
+ipcMain.handle('hr:join-lobby', async (_e, lobbyId) => {
+  try { return await connectLobby(String(lobbyId)); } catch (e) { console.warn('[steam] join lobby failed', e); return { error: 'Could not join that table.' }; }
+});
+ipcMain.handle('hr:ban-peer', (_e, steamId) => {
+  if (!steamId) return false;
+  bannedPeers.add(String(steamId));
+  tunnel?.dropPeer(String(steamId));
+  console.log('[tunnel] banned', steamId);
+  return true;
 });
 ipcMain.handle('hr:find-table', async (_e, code) => {
   try {
@@ -193,6 +220,7 @@ ipcMain.handle('hr:achievement', (_e, name) => steam?.unlock(String(name)) ?? fa
 ipcMain.handle('hr:overlay', (_e, dialog) => { steam?.openOverlay(dialog); return true; });
 ipcMain.handle('hr:fullscreen', (_e, on) => { win?.setFullScreen(on == null ? !win.isFullScreen() : !!on); return win?.isFullScreen(); });
 ipcMain.handle('hr:quit', () => app.quit());
+ipcMain.handle('hr:relay-port', () => tunnel?.clientRelayPort || null);
 ipcMain.handle('hr:keyboard', (_e, rect) => steam?.showKeyboard?.(rect) ?? false);
 ipcMain.handle('hr:open-log', () => { if (LOG_FILE) shell.showItemInFolder(LOG_FILE); return LOG_FILE; });
 
@@ -221,6 +249,7 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
   tunnel?.close();
+  relay?.close();
   steam?.leave();
   localServer?.close();
 });

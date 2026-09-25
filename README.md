@@ -19,6 +19,7 @@ The seated first-person view, the dealer and the casino floor take their cue fro
 
 - **Rooms with codes.** The host creates a table and gets a code like `K7QXP`. Friends type the code or open the invite link (`/?room=K7QXP`). Up to 8 players sit; anyone else watches as a spectator.
 - **Full NL Hold'em rules, enforced by the server.** Blinds (heads-up rules included), min-raise, incomplete all-in raises, side pots, split pots with odd chips, uncalled-bet refunds, and a run-out when players are all-in. Hole cards are only ever sent to their owner.
+- **Moderation.** A Players panel lets anyone mute a player or hide their camera just for themselves, and lets the host remove players (who then can't rejoin).
 - **Computer opponents.** *Play vs bots* starts a table with five bots right away. At any table the host can add Easy, Medium or Hard bots, or have bots keep the table at N players and step aside when friends join. Bots estimate their odds by simulating run-outs, read how aggressively opponents have played, and bluff, semi-bluff and slow-play at rates set by their difficulty.
 - **3D table.** Cards fly from the dealer and flip over, chips move between stacks, bets and the pot, and the winning 5 cards light up. Players lean back when they fold and cheer when they win. The camera has seated, overhead and free-orbit views.
 - **Webcam + mic.** Peer-to-peer WebRTC video appears as a gold-framed portrait over each player's seat. A green ring shows who is talking. You can also turn on regular video tiles.

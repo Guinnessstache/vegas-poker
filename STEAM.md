@@ -14,7 +14,15 @@ The desktop app is the same game wrapped in Electron, plus Steam features via
   search), or *Join Game* from the Steam friends list.
 - When the host quits, the table ends and guests are returned to their lobby.
 - Without Steam the app still runs; tables are just local to that PC.
-- Webcam/mic connect directly between players (WebRTC, using Google's public STUN servers).
+- **Browse open tables:** hosts can tick *List publicly*; everyone else finds those tables under
+  *Browse open tables* (a Steam lobby search — still no server of ours). Friends-only tables stay
+  unlisted and are joined by invite or code.
+- **Players panel:** anyone can mute a player or hide their camera just for themselves; the host
+  can remove players, who then can't rejoin that table (blocked by key and Steam ID).
+- Webcam/mic connect directly between players (WebRTC, using Google's public STUN servers). When a
+  direct connection isn't possible, video falls back to a small TURN relay running inside the
+  host's game (`server/turn.js`), which guests reach through the same Steam tunnel. Debug switch:
+  `localStorage.hr_force_relay = '1'` forces all video through the relay.
 - The browser version (GitHub Pages + the Render server) is separate and unaffected.
 
 ## Run it in development (Windows)

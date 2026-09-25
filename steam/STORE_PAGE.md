@@ -33,6 +33,10 @@ High Roller Hold'em puts you and your friends around a felt table in a high-end 
 - Full rules enforced: side pots, split pots, minimum raises, all-in run-outs and more.
 - Bet presets (½ pot, ¾ pot, pot, all-in), pre-action checkboxes and a turn timer everyone can see.
 
+**Find a game anytime**
+- *Browse open tables* shows public games from players around the world — join with one click.
+- Mute anyone or hide their camera just for you; hosts can remove players.
+
 **Never short a player**
 - *Play vs bots* deals you straight into a game.
 - Easy, Medium and Hard computer players with their own styles — from loose callers to sharp players who read the table, bluff and set traps.
@@ -57,7 +61,7 @@ Poker · Card Game · Casino · Multiplayer · Online PvP · Singleplayer · Cas
 ## Content survey notes
 
 - **Simulated gambling:** yes — poker with play chips. No real money, no purchasable chips, no cash-out.
-- **Voice/video chat:** players can share webcam and microphone with the people at their table (off by default; peer-to-peer). Steam may ask how players can mute/stop it: each player can mute, turn off their camera, or stop sharing at any time, and nothing is shared until they click "Join with camera & mic".
+- **Voice/video chat:** players can share webcam and microphone with the people at their table (off by default; peer-to-peer). Public tables can include strangers: every player can mute or hide any other player's camera for themselves, and the host can remove players, who then can't rejoin. Steam may ask how players can mute/stop it: each player can mute, turn off their camera, or stop sharing at any time, and nothing is shared until they click "Join with camera & mic".
 - **Text chat:** yes, table chat.
 - No violence, sexual content or drugs.
 

@@ -181,17 +181,47 @@ export class Steam {
   // Create (or reuse) the Steam lobby for a table this player is hosting. The lobby only
   // carries the table code and the host's Steam ID; the game itself runs in the host's app.
   // Public so friends can find it by table code (searches only match the exact code).
-  async hostTable({ code }) {
+  async hostTable({ code, listed = false }) {
     if (!this.client) return null;
     const me = this.mySteamId;
-    if (this.lobby && this.lobby.getData('code') === code && this.lobby.getData('host') === me) return String(this.lobby.id);
+    if (this.lobby && this.lobby.getData('code') === code && this.lobby.getData('host') === me) {
+      this.lobby.setData('listed', listed ? '1' : '0');
+      return String(this.lobby.id);
+    }
     this.leave();
     const { matchmaking } = this.client;
     this.lobby = await matchmaking.createLobby(2 /* Public */, 16);
-    this.lobby.mergeFullData({ code, host: me, game: GAME_TAG });
+    this.lobby.mergeFullData({ code, host: me, game: GAME_TAG, listed: listed ? '1' : '0', hostName: this.info().name || 'Host' });
     this.lobby.setJoinable(true);
     this.setPresence(code);
     return String(this.lobby.id);
+  }
+
+  // Table details shown in the browser (players, blinds, ...). Only the host writes these.
+  updateTable(info) {
+    if (!this.isHosting() || !info) return false;
+    const data = {};
+    for (const [k, v] of Object.entries(info)) data[k] = String(v);
+    try { return this.lobby.mergeFullData(data); } catch { return false; }
+  }
+
+  // Public tables for the "Browse open tables" screen.
+  async listTables() {
+    if (!this.client) return [];
+    const f = this.flatApi();
+    if (f) {
+      const mm = f.matchmaking();
+      f.lobbyStringFilter(mm, 'game', GAME_TAG, 0);
+      f.lobbyStringFilter(mm, 'listed', '1', 0);
+      f.lobbyDistanceFilter(mm, 3 /* Worldwide */);
+      f.lobbyCountFilter(mm, 50);
+    }
+    const lobbies = await this.client.matchmaking.getLobbies();
+    const me = this.mySteamId;
+    return lobbies
+      .map((l) => ({ lobbyId: String(l.id), members: Number(l.getMemberCount()), ...l.getFullData() }))
+      .filter((t) => t.game === GAME_TAG && t.listed === '1' && t.code)
+      .map((t) => ({ ...t, mine: t.host === me }));
   }
 
   // Find a hosted table by its code (anywhere in the world).
