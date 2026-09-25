@@ -603,8 +603,10 @@ $('copy-link').addEventListener('click', async () => {
       const q = new URLSearchParams({ c: app.code, a: String(inv.appId), l: inv.lobbyId, h: inv.steamId || '' });
       const steamUrl = `steam://joinlobby/${inv.appId}/${inv.lobbyId}${inv.steamId ? `/${inv.steamId}` : ''}`;
       const link = inv.base ? `${inv.base}?${q}` : steamUrl;
-      text = `Join my High Roller Hold'em poker table: ${link}\n(or open the game → Join table → code ${app.code})`;
-      note = 'Invite link copied — friends click it to join through Steam';
+      // Just the link, so it works pasted anywhere (chat or a browser's address bar); the page
+      // itself shows the table code as a backup.
+      text = link;
+      note = `Invite link copied (table code ${app.code}) — friends click it to join through Steam`;
     } else {
       text = `Join my High Roller Hold'em table on Steam: open the game, then Join table with code ${app.code}`;
       note = `Invite copied — friends enter code ${app.code} in the game`;
