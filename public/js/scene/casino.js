@@ -305,41 +305,93 @@ export function buildCasino(scene, quality = 'high') {
   });
 
   // ---------- Other table games ----------
-  function blackjackTable(x, z, rot) {
+  // Blackjack: a D-shaped table (dealer on the flat side), padded rail, stools, and players
+  // sitting at some of the five spots.
+  const bjWood = new THREE.MeshStandardMaterial({ map: woodTexture('#2a140a', [3, 1], 17), roughness: 0.35 });
+  const bjFelt = new THREE.MeshStandardMaterial({ color: 0x0c3f7a, roughness: 0.9 });
+  const bjLeather = new THREE.MeshStandardMaterial({ color: 0x160b07, roughness: 0.45 });
+  const bjCard = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.6 });
+  const bjCardGeo = new THREE.BoxGeometry(0.064, 0.002, 0.09);
+  const bjStoolPole = new THREE.CylinderGeometry(0.03, 0.03, 0.47, 8);
+  const bjStoolBase = new THREE.CylinderGeometry(0.2, 0.22, 0.03, 16);
+  const chipMats = [0xb3121f, 0x1a3a8a, 0x2a8a3a, 0x111111, 0xe8e0d0].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.4 }));
+  const chipGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.04, 12);
+  function blackjackTable(x, z, rot, occupied) {
     const g = new THREE.Group();
-    const shape = new THREE.Shape();
-    shape.absarc(0, 0, 1.1, Math.PI, 0, true);
-    shape.lineTo(1.1, 0.15); shape.lineTo(-1.1, 0.15); shape.closePath();
-    const felt = new THREE.Mesh(new THREE.ShapeGeometry(shape, 32).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x0c3f7a, roughness: 0.9 }));
-    felt.position.y = 0.76;
+    const R = 1.1;
+    const dShape = (r) => { const sh = new THREE.Shape(); sh.absarc(0, 0, r, Math.PI, 0, true); sh.lineTo(r, 0.15); sh.lineTo(-r, 0.15); sh.closePath(); return sh; };
+    // Wood body with a little thickness (shape y -> world -z, extrusion -> up)
+    const body = new THREE.Mesh(new THREE.ExtrudeGeometry(dShape(R + 0.04), { depth: 0.1, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 2, curveSegments: 40 }).rotateX(-Math.PI / 2), bjWood);
+    body.position.y = 0.655;
+    body.castShadow = true; body.receiveShadow = true;
+    const felt = new THREE.Mesh(new THREE.ShapeGeometry(dShape(R - 0.02), 40).rotateX(-Math.PI / 2), bjFelt);
+    felt.position.y = 0.768;
     felt.receiveShadow = true;
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.07, 10, 48, Math.PI), new THREE.MeshStandardMaterial({ color: 0x2a1510, roughness: 0.4 }));
-    rim.rotation.x = Math.PI / 2;
-    rim.position.y = 0.76;
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.74, 16), new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.5 }));
-    base.position.y = 0.37;
-    g.add(felt, rim, base);
+    // Padded rail round the curved edge
+    const rail = new THREE.Mesh(new THREE.TorusGeometry(R, 0.06, 12, 48, Math.PI), bjLeather);
+    rail.rotation.x = Math.PI / 2;
+    rail.scale.set(1, 1, 0.75);
+    rail.position.y = 0.79;
+    rail.castShadow = true;
+    // Two pedestals and a foot rail
+    for (const px of [-0.45, 0.45]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 0.66, 12), bjWood);
+      leg.position.set(px, 0.33, 0.35);
+      g.add(leg);
+    }
+    const foot = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.018, 8, 40, Math.PI), brass);
+    foot.rotation.x = Math.PI / 2;
+    foot.position.y = 0.18;
+    // Dealer's chip rack on the flat side
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.035, 0.13), bjLeather);
+    rack.position.set(0, 0.785, -0.05);
+    g.add(body, felt, rail, foot, rack);
+    for (let c = 0; c < 8; c++) {
+      const chip = new THREE.Mesh(chipGeo, chipMats[c % chipMats.length]);
+      chip.rotation.x = Math.PI / 2;
+      chip.position.set(-0.26 + c * 0.075, 0.8, -0.05);
+      g.add(chip);
+    }
+    // Dealer's hand
+    for (let c = 0; c < 2; c++) { const card = new THREE.Mesh(bjCardGeo, bjCard); card.position.set(-0.04 + c * 0.075, 0.771, 0.25); g.add(card); }
     const dealer = addNpc(buildNPC(seed += 31, true), 'dealer');
     dealer.group.userData.dynamic = true;
-    dealer.group.position.set(0, 0, -0.35);
+    dealer.group.position.set(0, 0, -0.42);
     dealer.group.rotation.y = Math.PI;
     g.add(dealer.group);
-    for (let i = 0; i < 3; i++) {
-      const a = Math.PI * (0.25 + i * 0.25);
-      const npc = buildNPC(seed += 17);
+    // Five spots round the curve, each with a stool; some have a player and cards.
+    for (let i = 0; i < 5; i++) {
+      const a = Math.PI * (0.17 + i * 0.165);
+      const dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+      const yaw = Math.atan2(dir.x, dir.z); // local -Z faces the table centre
+      const stool = new THREE.Group();
+      const seatM = new THREE.Mesh(stoolSeat, stoolMat); seatM.position.y = 0.51;
+      const pole = new THREE.Mesh(bjStoolPole, trayMat); pole.position.y = 0.25;
+      const base = new THREE.Mesh(bjStoolBase, trayMat); base.position.y = 0.015;
+      stool.add(seatM, pole, base);
+      stool.position.copy(dir).multiplyScalar(1.44);
+      g.add(stool);
+      if (!occupied.includes(i)) continue;
+      const npc = addNpc(buildNPC(seed += 17), 'seated');
       npc.group.userData.dynamic = true;
-      if ((i + x) % 2) addNpc(npc, 'seated');
-      npc.group.position.set(Math.cos(a) * 1.55, 0, Math.sin(a) * 1.55);
-      npc.group.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
-      if ((i + x) % 2) g.add(npc.group);
+      npc.group.position.copy(dir).multiplyScalar(1.44);
+      npc.group.rotation.y = yaw;
+      g.add(npc.group);
       npcAnim.push({ h: npc, phase: Math.random() * 10 });
+      for (let c = 0; c < 2; c++) {
+        const card = new THREE.Mesh(bjCardGeo, bjCard);
+        card.position.copy(dir).multiplyScalar(0.72).add(new THREE.Vector3(0, 0.771 + c * 0.002, 0));
+        card.rotation.y = yaw + (c ? 0.25 : -0.1);
+        card.position.x += c * 0.03;
+        g.add(card);
+      }
     }
     g.position.set(x, 0, z);
     g.rotation.y = rot;
     root.add(g);
   }
-  blackjackTable(-8.5, -3.2, Math.PI / 2 + 0.5);
-  blackjackTable(-8.5, 3.6, Math.PI / 2 - 0.5);
+  blackjackTable(-8.5, -3.2, Math.PI / 2 + 0.5, [1, 2, 4]);
+  blackjackTable(-8.5, 3.6, Math.PI / 2 - 0.5, [0, 2, 3]);
 
   // Roulette
   {
@@ -460,9 +512,9 @@ export function buildCasino(scene, quality = 'high') {
   const RIG_OPTS = {
     slot: { seatTop: 0.55, hands: { x: 0.14, y: 0.93, z: -0.42 } },
     bar: { seatTop: 0.62, hands: { x: 0.2, y: 1.0, z: -0.46 } },
-    seated: { seatTop: 0.55, hands: { x: 0.18, y: 0.8, z: -0.45 } },
+    seated: { seatTop: 0.55, hands: { x: 0.16, y: 0.84, z: -0.4 } },
     standing: { standing: true, hands: { x: 0.2, y: 0.8, z: -0.3 } },
-    dealer: { standing: true, hands: { x: 0.2, y: 0.82, z: -0.32 } },
+    dealer: { standing: true, hands: { x: 0.2, y: 0.84, z: -0.36 } },
   };
   let rigs = []; let rigBuild = 0; let rr = 0;
   function setPeople(templates) {
