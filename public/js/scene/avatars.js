@@ -1,6 +1,21 @@
 // Seated player avatars (with webcam "portrait" heads), the dealer, and background NPCs.
 import * as THREE from 'three';
 import { initialsTexture } from './textures.js';
+import { PersonRig, PEOPLE } from './people.js';
+
+// Realistic characters (people.js), once loaded and enabled; null = stylized primitives.
+let people = null;
+let peopleVersion = 0;
+export function setPeople(templates) {
+  const players = templates ? Object.fromEntries(Object.entries(templates).filter(([c]) => PEOPLE.includes(c))) : {};
+  people = Object.keys(players).length ? players : null;
+  peopleVersion++;
+}
+// The bots' names tell us who they are; human players get any character (their name picks it).
+const WOMEN = new Set(['dolly', 'marge', 'lady luck', 'stella', 'maxine', 'rosa', 'vera', 'queenie', 'lola', 'mae']);
+const MEN = new Set(['lucky lou', 'vinnie', 'big tex', 'sal', 'rocco', 'tommy two-pair', 'frankie', 'duke', 'johnny chips', 'slim', 'bugsy', 'nicky nuts', 'hank', 'benny']);
+const rigsInUse = new Map(); // PlayerAvatar -> character code
+const nameHash = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
 
 export const SEAT_COLORS = ['#b8342f', '#2f6bb8', '#2f9a5a', '#8a4fc0', '#d08a1e', '#1f9aa8', '#c04f8a', '#6b6b6b'];
 const SUIT_COLORS = [0x1c1c22, 0x2a2f3a, 0x3a2418, 0x14202e, 0x2e1a2a, 0x1f2a1f, 0x3a3a3a, 0x241c14];
@@ -179,7 +194,37 @@ export class PlayerAvatar {
       if (!this.videoTex) this.portraitMat.map = this.initialsTex;
       this.portraitMat.needsUpdate = true;
     }
+    this.pickRig();
     this.group.visible = true;
+  }
+
+  // Swap between the realistic character (chosen from the player's name, so each person keeps
+  // the same look every game) and the stylized one.
+  pickRig() {
+    const key = `${peopleVersion}|${this.name}`;
+    if (key === this.rigKey) return;
+    this.rigKey = key;
+    let code = null;
+    if (people && this.name) {
+      const all = Object.keys(people).sort();
+      const n = this.name.toLowerCase();
+      const pool = all.filter((c) => (WOMEN.has(n) ? c[0] === 'f' : MEN.has(n) ? c[0] === 'm' : true));
+      const list = pool.length ? pool : all;
+      const start = nameHash(this.name) % list.length;
+      const taken = new Set([...rigsInUse].filter(([a]) => a !== this && a.group.visible).map(([, c]) => c));
+      code = list[start];
+      for (let i = 0; i < list.length; i++) { const c = list[(start + i) % list.length]; if (!taken.has(c)) { code = c; break; } }
+    }
+    if (code) rigsInUse.set(this, code); else rigsInUse.delete(this);
+    if (code === (this.rigCode || null)) return;
+    if (this.rig) { this.group.remove(this.rig.group); this.rig = null; }
+    this.rigCode = code;
+    if (code) {
+      this.rig = new PersonRig(people[code]);
+      this.group.add(this.rig.group);
+    }
+    this.human.group.visible = !this.rig;
+    this.updateHeadVisibility();
   }
 
   clear() { this.group.visible = false; this.setVideo(null); this.name = ''; }
@@ -223,12 +268,22 @@ export class PlayerAvatar {
     this.human.head.visible = !showVideo;
     this.human.hair.visible = !showVideo;
     this.portrait.position.y = showVideo ? 1.3 : 1.62;
+    if (this.rig) {
+      this.rig.setHeadHidden(showVideo);
+      if (showVideo) this.portrait.position.y = this.rig.headY + 0.08;
+    }
     this.portraitBase = showVideo ? 1.25 : 0.6;
   }
 
   update(dt, camera, isTurn) {
     if (!this.group.visible) return;
     this.t += dt;
+    if (this.rig) this.rig.update(dt, { state: this.state, isTurn, lookAt: this.lookAt });
+    else this.animateHuman(dt, isTurn);
+    this.updatePortrait(camera);
+  }
+
+  animateHuman(dt, isTurn) {
     const h = this.human;
     // Breathing + idle sway
     const lean = this.state === 'folded' ? 0.12 : this.state === 'winner' ? -0.05 : 0;
@@ -244,7 +299,9 @@ export class PlayerAvatar {
     if (this.state === 'winner') {
       for (const a of h.arms) { a.shoulder.rotation.x = 2.6 + Math.sin(this.t * 6) * 0.2; a.elbow.rotation.x = 0.3; }
     }
+  }
 
+  updatePortrait(camera) {
     // Portrait faces the camera (yaw only for stability).
     if (this.portrait.visible && camera) {
       const wp = new THREE.Vector3();
@@ -265,16 +322,30 @@ export class PlayerAvatar {
 export class Dealer {
   constructor() {
     this.human = buildHuman({ suit: 0x141414, shirt: 0xf4f4f4, skin: 0xd9a88a, hair: 0x1a0f08, vest: true, bowtie: true, seated: false });
-    this.group = this.human.group;
+    this.group = new THREE.Group();
+    this.group.add(this.human.group);
+    this.rig = null;
     this.t = 0;
     this.dealing = 0;
     for (const a of this.human.arms) { a.shoulder.rotation.x = 0.35; a.elbow.rotation.x = 0.9; }
   }
 
-  pulseDeal(side = 1) { this.dealing = 1; this.dealSide = side; }
+  pulseDeal(side = 1) {
+    this.dealing = 1; this.dealSide = side;
+    if (this.rig) { this.rig.dealing = 1; this.rig.dealSide = side; }
+  }
+
+  // Realistic dealer (people.js) or null for the stylized one.
+  setRig(rig) {
+    if (this.rig) this.group.remove(this.rig.group);
+    this.rig = rig;
+    if (rig) this.group.add(rig.group);
+    this.human.group.visible = !rig;
+  }
 
   update(dt) {
     this.t += dt;
+    if (this.rig) { this.rig.update(dt, {}); return; }
     const h = this.human;
     h.headPivot.rotation.y = Math.sin(this.t * 0.3) * 0.35;
     h.torso.scale.y = 1 + Math.sin(this.t * 1.5) * 0.01;

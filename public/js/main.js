@@ -619,6 +619,11 @@ $('cam-cycle').addEventListener('click', () => {
 $('menu-btn').addEventListener('click', () => $('menu').classList.toggle('hidden'));
 $('quality-select').value = quality;
 $('quality-select').addEventListener('change', (e) => { local.set('hr_quality', e.target.value); world.setQuality(e.target.value); });
+// Realistic players: on by default except on phones / Low graphics (they're ~7 MB and heavier to draw).
+const peopleOn = () => { const v = local.get('hr_people'); return v ? v === '1' : !isMobile && quality !== 'low'; };
+$('people-toggle').checked = peopleOn();
+view.setRealisticPeople($('people-toggle').checked);
+$('people-toggle').addEventListener('change', (e) => { local.set('hr_people', e.target.checked ? '1' : '0'); view.setRealisticPeople(e.target.checked); });
 $('sfx-toggle').checked = sfx.sfxOn;
 $('sfx-toggle').addEventListener('change', (e) => { sfx.sfxOn = e.target.checked; local.set('hr_sfx', e.target.checked ? '1' : '0'); });
 $('amb-toggle').checked = local.get('hr_amb') !== '0';

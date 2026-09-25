@@ -4,7 +4,8 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { TABLE, seatAnchors, DEALER, buildChair, stadiumPoint } from './scene/table.js';
 import { Card3D } from './scene/cards.js';
 import { ChipPile, flyChips } from './scene/chips.js';
-import { PlayerAvatar, Dealer, SEAT_COLORS } from './scene/avatars.js';
+import { PlayerAvatar, Dealer, SEAT_COLORS, setPeople } from './scene/avatars.js';
+import { loadPeople, PersonRig, DEALER_CODE } from './scene/people.js';
 import { tween, wait, setTweenSpeed, finishAllTweens } from './scene/tween.js';
 
 const Y = TABLE.feltY;
@@ -110,6 +111,20 @@ export class GameView {
     this.scene.add(this.potLabel);
 
     world.onUpdate((dt) => this.update(dt));
+  }
+
+  // Realistic people (High/Medium graphics) or the stylized ones (Low). Loads on first use.
+  async setRealisticPeople(on) {
+    this.realistic = on;
+    let templates = null;
+    if (on) {
+      try { templates = await (this._people ||= loadPeople()); } catch { templates = null; }
+      if (!this.realistic) return; // switched off while loading
+    }
+    setPeople(templates);
+    for (const s of this.seats) s.avatar.pickRig();
+    const d = templates?.[DEALER_CODE];
+    this.dealer.setRig(d ? new PersonRig(d, { standing: true }) : null);
   }
 
   makeSeatLabel(i) {
@@ -613,7 +628,13 @@ export class GameView {
   update(dt) {
     this.updateBoardFloat(dt);
     const toAct = this.state?.table.toAct;
-    for (const s of this.seats) s.avatar.update(dt, this.world.camera, toAct === s.i);
+    // Everyone glances at whoever is acting.
+    const actor = toAct != null && toAct >= 0 ? this.seats[toAct] : null;
+    if (actor) (this._lookAt ||= new THREE.Vector3()).copy(actor.a.chair).setY(1.2);
+    for (const s of this.seats) {
+      s.avatar.lookAt = actor && actor !== s ? this._lookAt : null;
+      s.avatar.update(dt, this.world.camera, toAct === s.i);
+    }
     this.dealer.update(dt);
     // Turn ring on the felt doubles as a countdown: the arc drains and shifts green -> amber -> red.
     const ring = this.world.table.turnRing;
