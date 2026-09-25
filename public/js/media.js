@@ -16,6 +16,8 @@ export class MediaManager {
     this.onLocalStream = onLocalStream;
     this.camOn = false;
     this.micOn = false;
+    // Chosen devices ('' = system default); the page persists them.
+    this.devices = { video: opts.videoDevice || '', audio: opts.audioDevice || '', output: opts.outputDevice || '' };
     this.audioCtx = null;
     this.videoHost = document.createElement('div');
     this.videoHost.className = 'video-host';
@@ -81,6 +83,7 @@ export class MediaManager {
         v.dataset.pid = pid;
         this.videoHost.appendChild(v);
         peer.video = v;
+        if (this.devices.output) this.applySink(v);
       }
       if (peer.video.srcObject !== stream) peer.video.srcObject = stream;
       peer.video.muted = this.isMuted(pid);
@@ -154,9 +157,14 @@ export class MediaManager {
   async start({ video = true, audio = true } = {}) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera/mic need HTTPS (or localhost). Open the game over an https:// link.');
     let stream = null;
+    const v = this.videoConstraints(); const a = this.audioConstraints();
     const tries = [
-      { video: video ? { width: { ideal: 480 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 }, facingMode: 'user' } : false, audio: audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true } : false },
+      { video: video ? v : false, audio: audio ? a : false },
+      // The saved device may be unplugged: fall back to the defaults.
+      { video: video ? this.videoConstraints('') : false, audio: audio ? this.audioConstraints('') : false },
+      { video: false, audio: a },
       { video: false, audio: true },
+      { video: v, audio: false },
       { video: true, audio: false },
     ];
     let lastErr;
@@ -178,6 +186,59 @@ export class MediaManager {
     this.onLocalStream?.(stream);
     this.announce();
     return { cam: this.camOn, mic: this.micOn };
+  }
+
+  videoConstraints(id = this.devices.video) {
+    const c = { width: { ideal: 480 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 } };
+    if (id) c.deviceId = { exact: id }; else c.facingMode = 'user';
+    return c;
+  }
+
+  audioConstraints(id = this.devices.audio) {
+    const c = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    if (id) c.deviceId = { exact: id };
+    return c;
+  }
+
+  /** Cameras, microphones and speakers. Labels are blank until the page has camera/mic permission. */
+  async listDevices() {
+    const all = (await navigator.mediaDevices?.enumerateDevices?.().catch(() => [])) || [];
+    const pick = (kind, word) => all.filter((d) => d.kind === kind && d.deviceId !== 'default' && d.deviceId !== 'communications')
+      .map((d, i) => ({ id: d.deviceId, label: d.label || `${word} ${i + 1}` }));
+    return {
+      video: pick('videoinput', 'Camera'),
+      audio: pick('audioinput', 'Microphone'),
+      output: 'setSinkId' in HTMLMediaElement.prototype ? pick('audiooutput', 'Speakers') : null,
+      labelled: all.some((d) => d.label),
+    };
+  }
+
+  /** Switch camera ('video'), microphone ('audio') or speakers ('output') — live, without rejoining. */
+  async setDevice(kind, id) {
+    this.devices[kind] = id || '';
+    if (kind === 'output') { for (const p of this.peers.values()) this.applySink(p.video); return true; }
+    if (!this.local) return true; // used the next time the camera/mic starts
+    const old = kind === 'video' ? this.local.getVideoTracks()[0] : this.local.getAudioTracks()[0];
+    const fresh = await navigator.mediaDevices.getUserMedia(kind === 'video' ? { video: this.videoConstraints() } : { audio: this.audioConstraints() });
+    const track = kind === 'video' ? fresh.getVideoTracks()[0] : fresh.getAudioTracks()[0];
+    if (!track) return false;
+    if (old) track.enabled = old.enabled; // keep muted / camera-off as it was
+    for (const peer of this.peers.values()) {
+      const sender = old && peer.pc.getSenders().find((x) => x.track === old);
+      // replaceTrack swaps the source without renegotiating the connection.
+      if (sender) await sender.replaceTrack(track).catch((e) => console.warn('replaceTrack', e));
+      else peer.pc.addTrack(track, this.local);
+    }
+    if (old) { this.local.removeTrack(old); old.stop(); }
+    this.local.addTrack(track);
+    if (kind === 'video') this.camOn = track.enabled; else { this.micOn = track.enabled; this.localMeter = {}; this.attachAnalyser(this.localMeter, this.local); }
+    this.onLocalStream?.(this.local);
+    this.announce();
+    return true;
+  }
+
+  applySink(el) {
+    if (el?.setSinkId && this.devices.output !== undefined) el.setSinkId(this.devices.output || '').catch(() => {});
   }
 
   stop(announce = true) {

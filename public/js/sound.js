@@ -9,6 +9,12 @@ export class Sound {
     this.ambience = null;
   }
 
+  // Play game sounds on a chosen output device ('' = system default), where supported.
+  setOutput(id) {
+    this.sinkId = id || '';
+    this.ctx?.setSinkId?.(this.sinkId).catch(() => {});
+  }
+
   ensure() {
     if (!this.ctx) {
       try {
@@ -17,6 +23,7 @@ export class Sound {
         this.master.gain.value = 0.8;
         this.master.connect(this.ctx.destination);
         this.noiseBuf = this.makeNoise(2);
+        if (this.sinkId) this.setOutput(this.sinkId);
       } catch { return null; }
     }
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});

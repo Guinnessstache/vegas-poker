@@ -394,3 +394,15 @@ body.pad.my-turn .pad-hints:not(:empty) { display: flex; }
 .player-row .pr-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player-row .pr-tags { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 6px; }
 .player-row .btn.on { background: rgba(216,67,79,.25); border-color: #d8434f; }
+
+/* Camera & mic picker */
+.devices-form { width: min(380px, 86vw); display: flex; flex-direction: column; gap: 8px; }
+#devices-dialog { max-height: calc(100vh - 24px); overflow-y: auto; }
+.devices-form label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); }
+.devices-form select { margin-top: 4px; color: var(--ink); }
+.dev-preview { position: relative; height: min(210px, 26vh); aspect-ratio: 4 / 3; align-self: center; background: #000; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.dev-preview video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.dev-novideo { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+.dev-meter { height: 6px; background: #000; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.dev-meter div { height: 100%; width: 0; background: linear-gradient(90deg, #3c9a5a, #d4a84a); transition: width .08s; }
+.menu { max-height: calc(100vh - 110px); overflow-y: auto; }

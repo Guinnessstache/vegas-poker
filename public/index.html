@@ -141,6 +141,7 @@
         <label class="chk"><input type="checkbox" id="boardhud-toggle" /> Board cards on screen <kbd>B</kbd></label>
         <label class="chk"><input type="checkbox" id="float-toggle" /> Floating board cards</label>
         <label class="chk"><input type="checkbox" id="tiles-toggle" /> Show video tiles</label>
+        <button id="devices-btn" class="btn small ghost">Camera &amp; mic…</button>
         <button id="fullscreen-btn" class="btn small ghost">Fullscreen</button>
         <button id="stand-btn" class="btn small ghost">Stand up</button>
         <button id="ach-btn" class="btn small ghost">Achievements</button>
@@ -177,6 +178,7 @@
         <div id="media-controls" class="media-controls hidden">
           <button id="mic-btn" class="btn small" title="Mute / unmute">🎙<span class="lbl-long"> Mute</span></button>
           <button id="cam-btn" class="btn small" title="Camera on / off">📷<span class="lbl-long"> Camera off</span></button>
+          <button id="media-devices" class="btn small ghost" title="Choose camera, microphone and speakers">⚙</button>
           <button id="media-stop" class="btn small ghost" title="Stop camera &amp; mic">✕<span class="lbl-long"> Stop</span></button>
         </div>
       </div>
@@ -294,6 +296,19 @@
       <label class="chk hidden" id="listed-row"><input type="checkbox" id="listed-toggle" /> List this table in Browse tables</label>
       <div id="players-list" class="players-list"></div>
       <div class="dlg-btns"><button value="ok" class="btn gold small">Done</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="devices-dialog">
+    <form method="dialog" class="devices-form">
+      <h3>Camera &amp; mic</h3>
+      <div class="dev-preview"><video id="dev-video" muted playsinline autoplay></video><div id="dev-novideo" class="dev-novideo hidden">No camera</div></div>
+      <label>Camera<select id="dev-video-select"></select></label>
+      <label>Microphone<select id="dev-audio-select"></select></label>
+      <div class="dev-meter" title="Microphone level"><div id="dev-level"></div></div>
+      <label id="dev-output-row">Speakers<select id="dev-output-select"></select></label>
+      <p id="dev-note" class="hint"></p>
+      <div class="dlg-btns"><button type="button" id="dev-test" class="btn ghost small">Test speakers</button><button value="close" class="btn gold small" data-pad-default>Done</button></div>
     </form>
   </dialog>
 

@@ -144,7 +144,7 @@ async function createWindow() {
   win.once('ready-to-show', () => { win.show(); });
 
   // Camera + mic for the table video; everything else stays denied.
-  const allowed = new Set(['media', 'fullscreen', 'clipboard-sanitized-write', 'clipboard-read']);
+  const allowed = new Set(['media', 'speaker-selection', 'fullscreen', 'clipboard-sanitized-write', 'clipboard-read']);
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(allowed.has(permission)));
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowed.has(permission));
 

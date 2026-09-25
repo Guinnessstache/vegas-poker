@@ -60,6 +60,7 @@ const quality = local.get('hr_quality') || (isMobile ? 'medium' : 'high');
 // ---------------- boot ----------------
 const world = new World($('scene'), quality);
 const sfx = new Sound();
+if (local.get('hr_dev_output')) sfx.setOutput(local.get('hr_dev_output'));
 sfx.sfxOn = local.get('hr_sfx') !== '0';
 const app = { code: null, pid: null, room: null, state: null, lastTurnKey: '', lastStreetKey: '' };
 
@@ -86,6 +87,9 @@ const socketOpts = { transports: ['websocket', 'polling'] };
 const socket = SERVER ? io(SERVER, socketOpts) : io(socketOpts);
 const media = new MediaManager(socket, {
   iceUrl: `${SERVER}/api/ice`,
+  videoDevice: local.get('hr_dev_video') || '',
+  audioDevice: local.get('hr_dev_audio') || '',
+  outputDevice: local.get('hr_dev_output') || '',
   forceRelay: local.get('hr_force_relay') === '1',
   // Desktop: add the host's webcam relay as a fallback for players who can't connect directly.
   // The host reaches it locally; guests go through their own Steam tunnel port.
@@ -105,7 +109,9 @@ const media = new MediaManager(socket, {
     if (pid === app.pid) $('self-level').style.width = `${Math.round(level * 100)}%`;
   },
   onLocalStream: (stream) => {
-    $('self-video').srcObject = stream;
+    const sv = $('self-video');
+    if (sv.srcObject === stream) sv.srcObject = null; // same stream, new track: reload it
+    sv.srcObject = stream;
     $('self-wrap').classList.toggle('hidden', !stream || !stream.getVideoTracks().length);
   },
 });
@@ -715,6 +721,117 @@ $('media-start').addEventListener('click', async () => {
 $('mic-btn').addEventListener('click', () => { media.toggleMic(); updateMediaButtons(); });
 $('cam-btn').addEventListener('click', () => { media.toggleCam(); updateMediaButtons(); $('self-wrap').classList.toggle('hidden', !media.camOn); });
 $('media-stop').addEventListener('click', () => { media.stop(); resetMediaUI(); });
+
+// ---------------- camera & mic picker ----------------
+const devUI = { preview: null, meter: null, timer: null };
+const DEV_SELECTS = { video: 'dev-video-select', audio: 'dev-audio-select', output: 'dev-output-select' };
+
+function fillDeviceSelect(sel, list, current) {
+  sel.textContent = '';
+  sel.append(new Option('System default', ''));
+  for (const d of list) sel.append(new Option(d.label, d.id));
+  sel.value = list.some((d) => d.id === current) ? current : '';
+}
+
+async function refreshDeviceLists() {
+  const l = await media.listDevices();
+  fillDeviceSelect($(DEV_SELECTS.video), l.video, media.devices.video);
+  fillDeviceSelect($(DEV_SELECTS.audio), l.audio, media.devices.audio);
+  $('dev-output-row').classList.toggle('hidden', !l.output);
+  $('dev-test').classList.toggle('hidden', !l.output);
+  if (l.output) fillDeviceSelect($(DEV_SELECTS.output), l.output, media.devices.output);
+  $('dev-note').textContent = !l.labelled ? 'Device names show up once you allow camera & mic access.'
+    : media.local ? 'Changes apply right away — the table sees and hears the new device.'
+      : 'Used when you click “Join with camera & mic”.';
+}
+
+function stopDevicePreview() {
+  devUI.preview?.getTracks().forEach((t) => t.stop());
+  devUI.preview = null;
+}
+
+// Show the camera + mic level: the live shared stream if you're on camera, else a private preview.
+async function showDevicePreview() {
+  let stream = media.local;
+  if (!stream) {
+    stopDevicePreview();
+    const tries = [{ video: media.videoConstraints(), audio: media.audioConstraints() }, { video: false, audio: media.audioConstraints() }, { video: media.videoConstraints(), audio: false }, { video: true, audio: true }];
+    for (const c of tries) {
+      try { stream = await navigator.mediaDevices.getUserMedia(c); break; } catch (e) { if (e?.name === 'NotAllowedError') { $('dev-note').textContent = 'Camera & mic access is blocked — allow it and reopen this window.'; break; } }
+    }
+    if (!$('devices-dialog').open) { stream?.getTracks().forEach((t) => t.stop()); return; }
+    devUI.preview = stream;
+  }
+  const v = $('dev-video');
+  v.srcObject = null; v.srcObject = stream || null;
+  const hasCam = !!stream?.getVideoTracks().some((t) => t.readyState === 'live');
+  $('dev-novideo').classList.toggle('hidden', hasCam);
+  devUI.meter = {};
+  if (stream) media.attachAnalyser(devUI.meter, stream);
+  await refreshDeviceLists(); // permission granted -> real device names
+}
+
+function devLevel() {
+  const m = devUI.meter;
+  if (!m?.analyser) { $('dev-level').style.width = '0'; return; }
+  m.analyser.getByteTimeDomainData(m.levelBuf);
+  let sum = 0;
+  for (const x of m.levelBuf) { const d = (x - 128) / 128; sum += d * d; }
+  $('dev-level').style.width = `${Math.round(Math.min(1, Math.sqrt(sum / m.levelBuf.length) * 6) * 100)}%`;
+}
+
+function openDevices() {
+  $('menu').classList.add('hidden');
+  const d = $('devices-dialog');
+  if (d.open) return;
+  d.showModal();
+  refreshDeviceLists();
+  showDevicePreview();
+  clearInterval(devUI.timer);
+  devUI.timer = setInterval(devLevel, 80);
+}
+
+$('devices-dialog').addEventListener('close', () => {
+  clearInterval(devUI.timer);
+  stopDevicePreview();
+  devUI.meter = null;
+  $('dev-video').srcObject = null;
+});
+
+for (const [kind, id] of Object.entries(DEV_SELECTS)) {
+  $(id).addEventListener('change', async (e) => {
+    const value = e.target.value;
+    local.set(`hr_dev_${kind}`, value);
+    if (kind === 'output') { media.setDevice('output', value); sfx.setOutput(value); return; }
+    try {
+      if (media.local) { await media.setDevice(kind, value); updateMediaButtons(); }
+      else media.devices[kind] = value;
+      await showDevicePreview();
+    } catch (err) {
+      toast(err?.name === 'NotReadableError' ? 'That device is in use by another app.' : `Couldn't switch: ${err?.message || err}`, 5000);
+      refreshDeviceLists();
+    }
+  });
+}
+
+// A short two-note chime on the chosen speakers.
+$('dev-test').addEventListener('click', () => {
+  const rate = 22050; const n = Math.floor(rate * 0.7);
+  const buf = new DataView(new ArrayBuffer(44 + n * 2));
+  const w = (o, str) => [...str].forEach((c, i) => buf.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); buf.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); buf.setUint32(16, 16, true); buf.setUint16(20, 1, true); buf.setUint16(22, 1, true);
+  buf.setUint32(24, rate, true); buf.setUint32(28, rate * 2, true); buf.setUint16(32, 2, true); buf.setUint16(34, 16, true); w(36, 'data'); buf.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const t = i / rate; const f = t < 0.3 ? 660 : 880; const env = Math.min(1, t * 40) * Math.exp(-((t % 0.35) * 6));
+    buf.setInt16(44 + i * 2, Math.sin(2 * Math.PI * f * t) * env * 0.4 * 32767, true);
+  }
+  const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+  (a.setSinkId ? a.setSinkId(media.devices.output || '') : Promise.resolve()).catch(() => {}).finally(() => a.play().catch(() => {}));
+});
+
+$('devices-btn').addEventListener('click', openDevices);
+$('media-devices').addEventListener('click', openDevices);
+navigator.mediaDevices?.addEventListener?.('devicechange', () => { if ($('devices-dialog').open) refreshDeviceLists(); });
 
 function updateMediaButtons() {
   $('mic-btn').innerHTML = media.micOn ? '🎙<span class="lbl-long"> Mute</span>' : '🔇<span class="lbl-long"> Unmute</span>';
