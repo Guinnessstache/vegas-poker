@@ -406,3 +406,17 @@ body.pad.my-turn .pad-hints:not(:empty) { display: flex; }
 .dev-meter { height: 6px; background: #000; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .dev-meter div { height: 100%; width: 0; background: linear-gradient(90deg, #3c9a5a, #d4a84a); transition: width .08s; }
 .menu { max-height: calc(100vh - 110px); overflow-y: auto; }
+
+/* ---------- settings panel: grouped, scrolls instead of running off screen ---------- */
+.menu { width: 260px; gap: 7px; max-height: calc(100vh - 70px); max-height: calc(100dvh - 70px); overflow-y: auto; overscroll-behavior: contain; z-index: 40; }
+.menu-head { display: flex; align-items: center; justify-content: space-between; font-family: var(--display); color: var(--gold); font-weight: 800; font-size: 15px; }
+.menu-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.menu-btns .btn { padding: 7px 6px; font-size: 12px; }
+.menu-btns .hidden { display: none; }
+.menu-sec { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.menu label.row { display: flex; align-items: center; justify-content: space-between; }
+@media (max-width: 640px) {
+  .menu { position: fixed; top: 56px; left: 8px; right: 8px; width: auto; max-height: calc(100dvh - 68px); font-size: 15px; z-index: 60; }
+  .menu .chk { padding: 3px 0; }
+  .menu .chk input { width: 20px; height: 20px; }
+}

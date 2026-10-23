@@ -127,27 +127,34 @@
       </div>
       <button id="cam-cycle" class="btn small ghost icon cam-cycle" title="Change camera view (V)">👁</button>
       <button id="menu-btn" class="btn small ghost icon" title="Settings">⚙</button>
-      <div id="menu" class="menu hidden">
-        <label>Graphics
-          <select id="quality-select"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
-        </label>
-        <label>Interface size
-          <select id="uiscale-select"><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option><option value="1.5">150%</option></select>
-        </label>
-        <label class="chk"><input type="checkbox" id="people-toggle" checked /> Realistic players</label>
-        <label class="chk"><input type="checkbox" id="sfx-toggle" checked /> Sound effects</label>
-        <label class="chk"><input type="checkbox" id="amb-toggle" checked /> Casino ambience</label>
+      <div id="menu" class="menu hidden" role="dialog" aria-label="Settings">
+        <div class="menu-head"><span>Settings</span><button type="button" id="menu-close" class="btn small ghost icon" aria-label="Close settings">✕</button></div>
+        <div class="menu-btns">
+          <button id="ach-btn" class="btn small ghost">Achievements</button>
+          <button id="devices-btn" class="btn small ghost">Camera &amp; mic…</button>
+          <button id="fullscreen-btn" class="btn small ghost">Fullscreen</button>
+          <button id="stand-btn" class="btn small ghost">Stand up</button>
+          <button id="leave-btn" class="btn small red">Leave table</button>
+          <button id="log-btn" class="btn small ghost hidden">Open log file</button>
+          <button id="quit-btn" class="btn small ghost hidden">Quit game</button>
+        </div>
+        <div class="menu-sec">Cards</div>
         <label class="chk"><input type="checkbox" id="hudcards-toggle" /> My cards on screen</label>
         <label class="chk"><input type="checkbox" id="boardhud-toggle" /> Board cards on screen <kbd>B</kbd></label>
         <label class="chk"><input type="checkbox" id="float-toggle" /> Floating board cards</label>
+        <div class="menu-sec">Display</div>
+        <label class="row">Graphics
+          <select id="quality-select"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        </label>
+        <label class="row">Interface size
+          <select id="uiscale-select"><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option><option value="1.5">150%</option></select>
+        </label>
+        <label class="chk"><input type="checkbox" id="people-toggle" checked /> Realistic players</label>
+        <label class="chk"><input type="checkbox" id="mouselook-toggle" /> Look around with the mouse</label>
         <label class="chk"><input type="checkbox" id="tiles-toggle" /> Show video tiles</label>
-        <button id="devices-btn" class="btn small ghost">Camera &amp; mic…</button>
-        <button id="fullscreen-btn" class="btn small ghost">Fullscreen</button>
-        <button id="stand-btn" class="btn small ghost">Stand up</button>
-        <button id="ach-btn" class="btn small ghost">Achievements</button>
-        <button id="log-btn" class="btn small ghost hidden">Open log file</button>
-        <button id="leave-btn" class="btn small red">Leave table</button>
-        <button id="quit-btn" class="btn small ghost hidden">Quit game</button>
+        <div class="menu-sec">Sound</div>
+        <label class="chk"><input type="checkbox" id="sfx-toggle" checked /> Sound effects</label>
+        <label class="chk"><input type="checkbox" id="amb-toggle" checked /> Casino ambience</label>
         <div class="fps" id="fps"></div>
       </div>
     </div>

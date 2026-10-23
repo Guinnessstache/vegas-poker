@@ -115,7 +115,9 @@ export class World {
     this.camLook = new THREE.Vector3(0, TABLE.height, 0);
     this.mouse = new THREE.Vector2();
     this.lookOffset = new THREE.Vector2();
+    this.mouseLook = false; // off by default: the camera holds still while you use menus and buttons
     window.addEventListener('pointermove', (e) => {
+      if (!this.mouseLook || e.pointerType === 'touch') return;
       this.mouse.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
     });
 
