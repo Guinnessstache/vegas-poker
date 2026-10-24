@@ -872,6 +872,17 @@ function resetMediaUI() {
   $('self-wrap').classList.add('hidden');
 }
 
+// Phones: the video tiles stack under your own camera in the right-hand column instead of
+// floating over the top bar (where they covered the status line and your camera controls).
+const phoneLayout = matchMedia('(max-width: 640px)');
+function placeVideoTiles() {
+  const tiles = $('tiles');
+  const home = phoneLayout.matches ? document.querySelector('.media-panel') : $('hud');
+  if (home && tiles.parentElement !== home) home.appendChild(tiles);
+}
+phoneLayout.addEventListener?.('change', placeVideoTiles);
+placeVideoTiles();
+
 function renderTiles() {
   const box = $('tiles');
   if (box.classList.contains('hidden') || !app.room) { box.innerHTML = ''; return; }

@@ -420,3 +420,10 @@ body.pad.my-turn .pad-hints:not(:empty) { display: flex; }
   .menu .chk { padding: 3px 0; }
   .menu .chk input { width: 20px; height: 20px; }
 }
+
+/* Phones: video tiles in a scrolling column under your own camera (moved there by main.js). */
+@media (max-width: 640px) {
+  .media-panel .tiles { position: static; display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 430px); max-height: calc(100dvh - 430px); overflow-y: auto; overscroll-behavior: contain; }
+  .media-panel .tiles .tile { width: 96px; flex: none; }
+  .media-panel .tiles .tile span { font-size: 10px; left: 4px; bottom: 2px; }
+}
