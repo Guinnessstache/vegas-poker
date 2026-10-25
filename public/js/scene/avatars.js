@@ -267,11 +267,11 @@ export class PlayerAvatar {
     this.portrait.visible = showVideo || !!this.showPortraitAlways;
     this.human.head.visible = !showVideo;
     this.human.hair.visible = !showVideo;
-    this.portrait.position.y = showVideo ? 1.3 : 1.62;
-    if (this.rig) {
-      this.rig.setHeadHidden(showVideo);
-      if (showVideo) this.portrait.position.y = this.rig.headY + 0.08;
-    }
+    this.portrait.position.set(0, showVideo ? 1.3 : 1.62, 0);
+    if (this.rig) this.rig.setHeadHidden(showVideo);
+    // Top of the neck: the webcam disc sits on it, so its bottom edge clears the collar.
+    this.neckY = this.rig ? this.rig.headY : 1.18;
+    this.videoShown = showVideo;
     this.portraitBase = showVideo ? 1.25 : 0.6;
   }
 
@@ -311,7 +311,15 @@ export class PlayerAvatar {
       this.portrait.rotation.y = worldYaw - this.group.rotation.y;
       // Keep a similar on-screen size: shrink players sitting right next to the camera.
       const dist = Math.hypot(dx, dz, camera.position.y - wp.y);
-      this.portrait.scale.setScalar((this.portraitBase || 1) * THREE.MathUtils.clamp(dist / 2.3, 0.38, 1.15));
+      const scale = (this.portraitBase || 1) * THREE.MathUtils.clamp(dist / 2.3, 0.38, 1.15);
+      this.portrait.scale.setScalar(scale);
+      if (this.videoShown) {
+        // Rest the disc on the neck (bottom edge just above the collar) and nudge it toward the
+        // camera, so the shoulders and collar never cut into the face.
+        const r = 0.165 * scale; // disc radius + gold rim, in metres
+        const local = worldYaw - this.group.rotation.y;
+        this.portrait.position.set(Math.sin(local) * 0.12, this.neckY - 0.02 + r, Math.cos(local) * 0.12);
+      }
     }
     // Speaking glow on the rim
     const s = this.speaking;
