@@ -1,4 +1,4 @@
-# Generates Steam achievement icons (64x64: unlocked + locked) as casino chips.
+# Generates Steam achievement icons (256x256: unlocked + locked) as casino chips.
 #   python tools/make-achievement-icons.py   ->  steam/achievements/*.jpg
 import math, os
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
@@ -83,8 +83,8 @@ os.makedirs(GAME, exist_ok=True)
 sheet = Image.new('RGB', (10 * 136, 4 * 136), (30, 20, 12))
 for i, (aid, sym, tier) in enumerate(ICONS):
     big = chip(sym, tier)
-    on = big.resize((64, 64), Image.LANCZOS)
-    off = locked(big).resize((64, 64), Image.LANCZOS)
+    on = big.resize((256, 256), Image.LANCZOS)
+    off = locked(big).resize((256, 256), Image.LANCZOS)
     on.save(os.path.join(OUT, f'{aid}.jpg'), quality=95)
     off.save(os.path.join(OUT, f'{aid}_locked.jpg'), quality=95)
     big.resize((128, 128), Image.LANCZOS).save(os.path.join(GAME, f'{aid}.jpg'), quality=88)

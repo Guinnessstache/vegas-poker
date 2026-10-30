@@ -7,22 +7,19 @@ Edit freely; this is a starting point written from what the game actually does.
 
 ## Game name
 
-High Roller Hold'em
-
-> Before submitting, search the Steam store for "High Roller" — it's a common phrase, and a
-> clearly distinct name avoids confusion in search. The game's files already use this name.
+Poker Night Live
 
 ## Short description (max 300 characters)
 
-> Deal in your friends for No-Limit Texas Hold'em at a 3D Vegas table — with their live webcams and voices right in the seats. Invite through Steam, host your own table with no servers, or sit down against Easy, Medium or Hard bots anytime.
+> Real No-Limit Texas Hold'em with your friends — live webcam and voice chat right at the table. Seat up to 7 friends online, or play solo against Easy, Medium and Hard bots anytime.
 
-(≈245 characters)
+(175 characters)
 
 ## About This Game
 
 **Poker night, without the drive.**
 
-High Roller Hold'em puts you and your friends around a felt table in a high-end Vegas card room. Everyone's webcam shows up right at their seat and their voice comes from across the table, so the bluffs, the groans and the trash talk are all real.
+Poker Night Live puts you and your friends around a felt table in a high-end Vegas card room. Everyone's webcam shows up right at their seat and their voice comes from across the table, so the bluffs, the groans and the trash talk are all real.
 
 **Your table, your rules**
 - Create a table and invite Steam friends in two clicks, or share a five-letter table code.

@@ -4,7 +4,7 @@ Enter these in **Steamworks → your app → Edit Steamworks Settings → Stats 
 then **Publish** (Steamworks changes don't go live until published).
 
 For each row: *New Achievement* → API Name, Display Name, Description, and upload the two icons from
-`steam/achievements/` (achieved = `NAME.jpg`, unachieved = `NAME_locked.jpg`, 64×64).
+`steam/achievements/` (achieved = `NAME.jpg`, unachieved = `NAME_locked.jpg`, 256×256).
 Leave "Hidden" off and "Set by" = Client. No Steam stats are needed: running totals are kept by the game.
 
 The API Name must match exactly; the game unlocks achievements by these names

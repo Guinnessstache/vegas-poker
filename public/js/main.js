@@ -608,7 +608,7 @@ $('copy-link').addEventListener('click', async () => {
       text = link;
       note = `Invite link copied (table code ${app.code}) — friends click it to join through Steam`;
     } else {
-      text = `Join my High Roller Hold'em table on Steam: open the game, then Join table with code ${app.code}`;
+      text = `Join my Poker Night Live table on Steam: open the game, then Join table with code ${app.code}`;
       note = `Invite copied — friends enter code ${app.code} in the game`;
     }
     try { await navigator.clipboard.writeText(text); toast(note, 4500); }
@@ -617,7 +617,7 @@ $('copy-link').addEventListener('click', async () => {
   }
   const url = `${PUBLIC_BASE}/?room=${app.code}`;
   try {
-    if (navigator.share && isMobile) await navigator.share({ title: "High Roller Hold'em", text: `Join my poker table! Code ${app.code}`, url });
+    if (navigator.share && isMobile) await navigator.share({ title: "Poker Night Live", text: `Join my poker table! Code ${app.code}`, url });
     else { await navigator.clipboard.writeText(url); toast('Invite link copied — send it to your friends!'); }
   } catch { toast(`Share this link: ${url}`); }
 });
@@ -663,11 +663,11 @@ $('sfx-toggle').checked = sfx.sfxOn;
 $('sfx-toggle').addEventListener('change', (e) => { sfx.sfxOn = e.target.checked; local.set('hr_sfx', e.target.checked ? '1' : '0'); });
 $('amb-toggle').checked = local.get('hr_amb') !== '0';
 $('amb-toggle').addEventListener('change', (e) => { sfx.setAmbience(e.target.checked); local.set('hr_amb', e.target.checked ? '1' : '0'); });
-// Readability helpers (default on for phones): flat 2D hole cards + floating community cards.
+// Readability helpers (default on everywhere): flat 2D hole cards, board strip, floating community cards, video tiles.
 const pref = (k, dflt) => { const v = local.get(k); return v === null ? dflt : v === '1'; };
-app.hudCards = pref('hr_hudcards', isMobile);
-app.boardHud = pref('hr_boardhud', isMobile);
-view.floatBoard = pref('hr_float', false);
+app.hudCards = pref('hr_hudcards', true);
+app.boardHud = pref('hr_boardhud', true);
+view.floatBoard = pref('hr_float', true);
 $('boardhud-toggle').checked = app.boardHud;
 $('boardhud-toggle').addEventListener('change', (e) => { app.boardHud = e.target.checked; local.set('hr_boardhud', e.target.checked ? '1' : '0'); renderBoardStrip(app.lastBoard || [], app.lastTable); });
 view.onBoard = (cards, table) => { app.lastBoard = cards; app.lastTable = table; renderBoardStrip(cards, table); };
@@ -675,7 +675,9 @@ $('hudcards-toggle').checked = app.hudCards;
 $('float-toggle').checked = view.floatBoard;
 $('hudcards-toggle').addEventListener('change', (e) => { app.hudCards = e.target.checked; local.set('hr_hudcards', e.target.checked ? '1' : '0'); app.cardsKey = ''; updateHUD(); });
 $('float-toggle').addEventListener('change', (e) => { view.floatBoard = e.target.checked; local.set('hr_float', e.target.checked ? '1' : '0'); });
-$('tiles-toggle').addEventListener('change', (e) => { $('tiles').classList.toggle('hidden', !e.target.checked); renderTiles(); });
+$('tiles-toggle').checked = pref('hr_tiles', true);
+$('tiles').classList.toggle('hidden', !$('tiles-toggle').checked);
+$('tiles-toggle').addEventListener('change', (e) => { local.set('hr_tiles', e.target.checked ? '1' : '0'); $('tiles').classList.toggle('hidden', !e.target.checked); renderTiles(); });
 $('fullscreen-btn').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.();
 });

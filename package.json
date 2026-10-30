@@ -40,7 +40,7 @@
   "build": {
     "appId": "com.guinnessstache.highroller",
     "productName": "Poker Night Live",
-    "executableName": "HighRoller",
+    "executableName": "PokerNightLive",
     "directories": {
       "output": "dist",
       "buildResources": "build"

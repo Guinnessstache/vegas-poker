@@ -340,7 +340,7 @@ export function feltTexture(lengthM, widthM, color = '#0d6b3c') {
   ctx.fillStyle = 'rgba(232, 200, 120, 0.22)';
   ctx.font = `bold ${Math.round(0.07 * pxPerM)}px Georgia, serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('HIGH ROLLER', W / 2, H / 2 + ch * 0.95);
+  ctx.fillText('POKER NIGHT LIVE', W / 2, H / 2 + ch * 0.95);
   ctx.font = `italic ${Math.round(0.04 * pxPerM)}px Georgia, serif`;
   ctx.fillText("No-Limit Texas Hold'em", W / 2, H / 2 + ch * 1.35);
   ctx.save();

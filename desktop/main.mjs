@@ -38,7 +38,7 @@ function setupLogFile() {
     const dir = app.getPath('userData');
     mkdirSync(dir, { recursive: true });
     LOG_FILE = path.join(dir, 'highroller.log');
-    writeFileSync(LOG_FILE, `High Roller Hold'em ${app.getVersion()} — ${process.platform} — ${new Date().toISOString()}\n`);
+    writeFileSync(LOG_FILE, `Poker Night Live ${app.getVersion()} — ${process.platform} — ${new Date().toISOString()}\n`);
     const fmt = (x) => (typeof x === 'string' ? x : x instanceof Error ? (x.stack || x.message)
       : JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? String(v) : v)));
     for (const level of ['log', 'warn', 'error']) {
@@ -130,7 +130,7 @@ async function createWindow() {
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#0b0604',
-    title: "High Roller Hold'em",
+    title: "Poker Night Live",
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
