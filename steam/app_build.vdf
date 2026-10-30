@@ -1,11 +1,11 @@
 "AppBuild"
 {
-	"AppID"	"480"
-	"Desc"	"High Roller Hold'em build"
+	"AppID"	"5534910"
+	"Desc"	"Poker Night Live build"
 	"ContentRoot"	"..\dist\win-unpacked\"
 	"BuildOutput"	".\output\"
 	"Depots"
 	{
-		"481"	"depot_build_windows.vdf"
+		"5534911"	"depot_build_windows.vdf"
 	}
 }

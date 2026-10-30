@@ -31,7 +31,7 @@
     "url": "https://github.com/Guinnessstache/vegas-poker.git"
   },
   "homepage": "https://guinnessstache.github.io/vegas-poker/",
-  "productName": "High Roller Hold'em",
+  "productName": "Poker Night Live",
   "author": "GuinnessStache",
   "devDependencies": {
     "electron": "^44.4.5",
@@ -39,7 +39,7 @@
   },
   "build": {
     "appId": "com.guinnessstache.highroller",
-    "productName": "High Roller Hold'em",
+    "productName": "Poker Night Live",
     "executableName": "HighRoller",
     "directories": {
       "output": "dist",
