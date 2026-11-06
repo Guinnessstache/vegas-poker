@@ -21,7 +21,20 @@ function visible(el) {
 export class PadNav {
   constructor() {
     this.current = null;
+    this.editing = false; // A on a dropdown/slider: the d-pad changes its value until A/B again
   }
+
+  // Is the highlight on a visible control inside `root`?
+  isLive(root) { return !!(this.current && root.contains(this.current) && this.current.isConnected && visible(this.current)); }
+
+  setEditing(on) {
+    this.editing = !!(on && this.current);
+    document.querySelectorAll('.pad-editing').forEach((e) => e.classList.remove('pad-editing'));
+    if (this.editing) this.current.classList.add('pad-editing');
+  }
+
+  // B while changing a value: stop changing it (returns true if it did anything).
+  cancelEdit() { if (!this.editing) return false; this.setEditing(false); return true; }
 
   items(root) {
     return [...root.querySelectorAll(FOCUSABLE)].filter((el) => !el.closest('[data-pad-skip]') && visible(el));
@@ -29,6 +42,7 @@ export class PadNav {
 
   // Put the highlight on `el` (or the root's default / first control).
   focus(el) {
+    if (this.current !== el) this.setEditing(false);
     if (this.current && this.current !== el) this.current.classList.remove('pad-focus');
     this.current = el || null;
     if (!el) return;
@@ -52,7 +66,7 @@ export class PadNav {
     const had = this.current && root.contains(this.current) && visible(this.current);
     const cur = this.ensure(root);
     if (!cur || !had) return; // the first press just shows where the highlight is
-    if ((dir === 'left' || dir === 'right') && this.adjust(cur, dir === 'right' ? 1 : -1)) return;
+    if (this.editing) { this.adjust(cur, dir === 'right' || dir === 'down' ? 1 : -1); return; }
     const a = cur.getBoundingClientRect();
     const ax = a.left + a.width / 2; const ay = a.top + a.height / 2;
     let best = null; let bestScore = Infinity;
@@ -96,7 +110,7 @@ export class PadNav {
     const el = this.current;
     if (!el) return false;
     if (el.tagName === 'INPUT' && ['text', 'search', 'number', ''].includes(el.type)) { onText?.(el); return true; }
-    if (el.tagName === 'SELECT') { this.adjust(el, 1); return true; }
+    if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.type === 'range')) { this.setEditing(!this.editing); return true; }
     el.click();
     return true;
   }

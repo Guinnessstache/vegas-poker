@@ -354,7 +354,10 @@ dialog select { width: 100%; margin-top: 10px; background: #000; border: 1px sol
 /* ---------- controller ---------- */
 :root { --ui-zoom: 1; }
 .top-left, .top-right, .bottom-left, .bottom-right, .bottom-center, .lobby-inner, dialog, .toast, .banner, .ach-pop, .osk { zoom: var(--ui-zoom); }
-.pad-focus { outline: 3px solid var(--gold) !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(232,192,96,.28), 0 0 18px rgba(232,192,96,.45) !important; position: relative; z-index: 2; }
+.pad-focus { outline: 3px solid #fff !important; outline-offset: 3px; box-shadow: 0 0 0 7px var(--gold), 0 0 26px 6px rgba(232,192,96,.75) !important; position: relative; z-index: 2; transform: scale(1.04); transition: transform .12s, box-shadow .12s; }
+select.pad-focus, input.pad-focus { background-color: rgba(232,192,96,.22) !important; }
+.pad-editing { outline-color: #5fe08a !important; box-shadow: 0 0 0 7px #2fae5f, 0 0 26px 6px rgba(80,220,130,.7) !important; }
+body:not(.pad) .pad-editing { outline: none !important; box-shadow: none !important; }
 body:not(.pad) .pad-focus { outline: none !important; box-shadow: none !important; }
 kbd.pad-glyph { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; padding: 0 .35em; border-radius: 1em; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.35); color: #fff; font-weight: 800; font-size: .72em; line-height: 1; vertical-align: middle; }
 body[data-pad="xbox"] kbd.g-a { color: #6fdc6f; } body[data-pad="xbox"] kbd.g-b { color: #ff6b6b; }

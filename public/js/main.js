@@ -362,6 +362,9 @@ socket.on('state', (s) => {
     if (tryPreAction(s.you.legal)) return;
   }
   updateHUD();
+  // Controller: clear any highlight when your turn starts, so A = Call/Check exactly as the bar shows
+  // (Fold/Call/Raise have dedicated buttons and are never highlighted).
+  if (!wasMyTurn && s.you.legal && padStyle && padLayer()?.type === 'table') nav.clear();
 });
 
 socket.on('events', (events) => {
@@ -1249,6 +1252,7 @@ const pad = new PadInput({
     if (L.type !== 'table') {
       if (dir) nav.move(L.root, dir);
       else if (name === 'a') { nav.ensure(L.root); nav.activate(openKeyboard); }
+      else if (name === 'b' && nav.cancelEdit()) { /* stopped changing a dropdown */ }
       else if (name === 'b' || (name === 'menu' && L.type === 'menu')) {
         if (L.type === 'dialog') L.root.close();
         else if (L.type === 'menu') $('menu').classList.add('hidden');
@@ -1259,7 +1263,7 @@ const pad = new PadInput({
 
     // At the table.
     const legal = app.state?.you.legal;
-    const focused = nav.current && $('hud').contains(nav.current) && nav.current.isConnected;
+    const focused = nav.isLive($('hud')); // a highlight left on a now-hidden button doesn't count
     if (dir) { if (!focused) hudEntry(); else nav.move(L.root, dir); return; }
     switch (name) {
       case 'a':
@@ -1267,7 +1271,7 @@ const pad = new PadInput({
         else if (legal) $('call-btn').click();
         else if (!$('start-btn').classList.contains('hidden') && !$('host-controls').classList.contains('hidden')) $('start-btn').click();
         break;
-      case 'b': nav.clear(); break;
+      case 'b': if (!nav.cancelEdit()) nav.clear(); break;
       case 'x':
         if (!legal) break;
         $('fold-btn').classList.add('holding');

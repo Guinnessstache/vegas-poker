@@ -110,7 +110,8 @@ function seatPose(root, b, p = {}) {
   r('L_Calf', X, p.calf ?? 95); r('R_Calf', X, p.calf ?? 95);
   r('L_Thigh', Y, -7); r('R_Thigh', Y, 7);
   r('L_Foot', X, -8); r('R_Foot', X, -8);
-  r('Spine', X, p.lean ?? 10); r('Neck', X, -(p.lean ?? 10) * 0.6);
+  // Lean in over the table like a real player, so the hands reach the rail with bent elbows.
+  r('Spine', X, p.lean ?? 24); r('Neck', X, -(p.lean ?? 24) * 0.6);
   r('L_UpperArm', Z, p.armDown ?? -72); r('R_UpperArm', Z, -(p.armDown ?? -72));
   r('L_UpperArm', X, -(p.armFwd ?? 22)); r('R_UpperArm', X, -(p.armFwd ?? 22));
   r('L_Forearm', X, -(p.fore ?? 70)); r('R_Forearm', X, -(p.fore ?? 70));
@@ -211,7 +212,8 @@ export class PersonRig {
     const root = this.root;
     const S = pos(root, upper); const E = pos(root, fore); const H = pos(root, hand);
     const a = E.distanceTo(S); const bl = H.distanceTo(E);
-    const dist = THREE.MathUtils.clamp(T.distanceTo(S), Math.abs(a - bl) + 1, a + bl - 0.5);
+    // Never let the arm lock straight (that reads as "zombie arms"): keep at least a soft bend.
+    const dist = THREE.MathUtils.clamp(T.distanceTo(S), Math.abs(a - bl) + 1, (a + bl) * 0.9);
     const want = Math.acos(THREE.MathUtils.clamp((a * a + bl * bl - dist * dist) / (2 * a * bl), -1, 1));
     const u = S.clone().sub(E); const v = H.clone().sub(E);
     const n = u.clone().cross(v);
@@ -299,7 +301,7 @@ export class PersonRig {
           const d = this.dealSide === s ? Math.sin(Math.min(1, this.dealing) * Math.PI) : 0;
           tgt.add(new THREE.Vector3(-s * 0.12 * d, -0.02 * d, -0.2 * d));
         } else {
-          const hp = this.hands || { x: 0.17, y: 0.87, z: -0.43 };
+          const hp = this.hands || { x: 0.13, y: 0.885, z: -0.42 };
           const rail = new THREE.Vector3(-s * hp.x, hp.y, hp.z); // model +X (its left) is our -X
           const lap = new THREE.Vector3(-s * 0.13, 0.66, -0.2);
           tgt = rail.lerp(lap, this.wFold);
@@ -310,7 +312,7 @@ export class PersonRig {
         const T = root.worldToLocal(this.group.localToWorld(tgt));
         const upper = b[`Bip01_${side}_UpperArm`]; const fore = b[`Bip01_${side}_Forearm`]; const hand = b[`Bip01_${side}_Hand`];
         const before = [upper.quaternion.clone(), fore.quaternion.clone()];
-        this.ik(upper, fore, hand, T, new THREE.Vector3(s * 0.55, -1, -0.35));
+        this.ik(upper, fore, hand, T, this.standing ? new THREE.Vector3(s * 0.55, -1, -0.35) : new THREE.Vector3(s * 0.6, -1, -0.05));
         this.orientHand(side, 0.35 + this.wFold * 0.5, 0.1);
         if (armW < 1) {
           upper.quaternion.copy(before[0].slerp(upper.quaternion, armW));
