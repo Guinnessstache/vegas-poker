@@ -169,7 +169,7 @@ async function createWindow() {
 }
 
 // ---------- IPC for the renderer (see preload.cjs) ----------
-ipcMain.handle('hr:steam-info', () => ({ ...(steam?.info() ?? { ok: false }), overlay: LAUNCHED_BY_STEAM }));
+ipcMain.handle('hr:steam-info', () => ({ ...(steam?.info() ?? { ok: false }), overlay: LAUNCHED_BY_STEAM, quickMatch: !!(config.quickMatch || process.env.HR_QUICKMATCH) }));
 ipcMain.handle('hr:host-table', async (_e, { code, listed }) => {
   try {
     if (tunnel?.clientPeer) return { ok: false, error: 'not the host' };

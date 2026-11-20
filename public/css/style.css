@@ -384,6 +384,9 @@ body.pad.my-turn .pad-hints:not(:empty) { display: flex; }
 .list-row { margin-top: 12px; font-size: 14px; }
 .hint-inline { color: var(--muted); font-size: 12px; }
 #browse-dialog { width: min(640px, 94vw); }
+#qm-dialog { width: min(520px, 94vw); }
+.qm-count { font-size: .7em; color: var(--muted); margin-left: 8px; font-weight: 400; }
+.table-row.qm-open { opacity: .45; border-style: dashed; border-color: var(--line); }
 .browse-list, .players-list { display: flex; flex-direction: column; gap: 6px; max-height: min(58vh, 520px); overflow-y: auto; margin-top: 8px; }
 .table-row, .player-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid transparent; }
 .table-row.mine { border-color: var(--line); }

@@ -94,6 +94,7 @@ export function createGameServer({ relay } = {}) {
     socket.on('sit', guard((d) => room.sit(member, Number(d?.seat))));
     socket.on('stand', guard(() => room.stand(member)));
     socket.on('start', guard(() => room.start(member)));
+    socket.on('ready', guard((d) => room.setReady(member, d?.on)));
     socket.on('pause', guard(() => room.pause(member)));
     socket.on('act', guard((d) => room.act(member, String(d?.action), d?.amount)));
     socket.on('rebuy', guard(() => room.rebuy(member)));

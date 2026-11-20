@@ -92,6 +92,7 @@
           </label>
           <button id="join-btn" class="btn green big">Join table</button>
           <button id="browse-btn" class="btn ghost big hidden" type="button">Browse open tables</button>
+          <button id="quick-btn" class="btn green big hidden" type="button">Quick Match</button>
           <p class="hint">Got an invite link? It fills the code in for you.</p>
         </div>
       </div>
@@ -293,6 +294,15 @@
       <p id="browse-status" class="hint"></p>
       <div id="browse-list" class="browse-list"></div>
       <div class="dlg-btns"><button type="button" id="browse-refresh" class="btn small">Refresh</button><button value="ok" class="btn gold small">Close</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="qm-dialog">
+    <form method="dialog">
+      <h3>Quick Match <span id="qm-count" class="qm-count"></span></h3>
+      <p id="qm-status" class="hint"></p>
+      <div id="qm-list" class="browse-list"></div>
+      <div class="dlg-btns"><button type="button" id="qm-leave" class="btn small">Leave</button><button type="button" id="qm-ready" class="btn green">Ready</button></div>
     </form>
   </dialog>
 

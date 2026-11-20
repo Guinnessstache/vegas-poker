@@ -2,5 +2,7 @@
   "steamAppId": 5534910,
   "_comment": "steamAppId is Poker Night Live's real App ID (5534910). For development without the real app you can set STEAM_APP_ID=480 (Valve's public Spacewar test app). There is no online server: each table is hosted inside the creator's game and friends connect through Steam.",
   "inviteBase": "https://guinnessstache.github.io/vegas-poker/join.html",
-  "_inviteComment": "inviteBase: a static page (docs/join.html on GitHub Pages) that turns a copied invite into a \"Join in Steam\" button. It needs no server."
+  "_inviteComment": "inviteBase: a static page (docs/join.html on GitHub Pages) that turns a copied invite into a \"Join in Steam\" button. It needs no server.",
+  "quickMatch": true,
+  "_quickMatchComment": "quickMatch: shows the Quick Match button (joins the best open public table, or opens one with bots). Off until it has been tested; set to true to enable. HR_QUICKMATCH=1 turns it on for one run."
 }

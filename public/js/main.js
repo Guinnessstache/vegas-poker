@@ -328,8 +328,13 @@ socket.on('connect_error', () => serverStatus.error());
 socket.on('connect', () => serverStatus.connected());
 socket.on('disconnect', () => serverStatus.lost());
 
+// Quick Match lobby: keep its countdown ticking.
+setInterval(() => { if (app.room?.lobby) syncLobby(); }, 500);
+
 socket.on('room', (room) => {
   app.room = room;
+  app.lobbyEnd = room.lobbyLeft ? performance.now() + room.lobbyLeft : 0;
+  syncLobby();
   view.setRoom(room, app.pid);
   media.syncMembers(room.members);
   if ($('bots-dialog').open) renderBotsDialog();
@@ -395,13 +400,14 @@ function updateHUD() {
 
   // Host controls
   $('host-controls').classList.toggle('hidden', !you.isHost);
-  $('start-btn').classList.toggle('hidden', room.running);
+  $('start-btn').classList.toggle('hidden', room.running || !!room.lobby);
   $('pause-btn').classList.toggle('hidden', !room.running);
 
   // Status line
   const seated = t.seats.filter(Boolean).length;
   let status = '';
-  if (you.seat < 0) status = '👀 Spectating — click “Sit here” on an empty seat to play';
+  if (room.lobby) status = 'Quick Match lobby — waiting for players';
+  else if (you.seat < 0) status = '👀 Spectating — click “Sit here” on an empty seat to play';
   else if (!room.running) status = you.isHost ? (seated < 2 ? 'Share the code, or add bots (Bots…) to play now' : 'Ready when you are — hit “Deal cards”') : 'Waiting for the host to deal';
   else if (t.street === 'idle') status = seated < 2 ? 'Waiting for more players…' : 'Shuffling up…';
   else status = `Hand #${t.handNumber} · Blinds ${fmt(t.sb)}/${fmt(t.bb)} · ${t.street === 'preflop' ? 'Pre-flop' : t.street[0].toUpperCase() + t.street.slice(1)}`;
@@ -1156,6 +1162,89 @@ async function refreshBrowser() {
   }
 }
 $('browse-btn').addEventListener('click', () => { $('browse-dialog').showModal(); refreshBrowser(); });
+
+// ---------------- Quick Match (Steam) ----------------
+// Joins the best open public table: most real players first, then nearest (Steam lists lobbies
+// nearest first). If there is none, opens a public table of your own with bots that step aside
+// as real players arrive, so nobody waits. Uses only Steam lobbies: no server of ours involved.
+async function quickMatch() {
+  const name = getName();
+  if (!name) return;
+  unlockAudio();
+  const res = await whileBusy($('quick-btn'), 'Finding a table…', async () => {
+    const list = await desktop.listTables().catch(() => ({ ok: false, tables: [] }));
+    const tables = (list.tables || [])
+      .map((t, i) => ({ ...t, i, humans: +t.humans || 0, seats: +t.seats || 8 }))
+      .filter((t) => !t.mine && t.humans > 0 && t.humans < t.seats);
+    // Fresh games first (tables still in their waiting room), then the most real players, then nearest.
+    tables.sort((a, b) => (a.running === '1') - (b.running === '1') || b.humans - a.humans || a.i - b.i);
+    for (const t of tables.slice(0, 3)) { // a table may have just closed or filled: try the next
+      const target = await desktop.joinLobby(t.lobbyId).catch(() => null);
+      if (target?.server) return { joined: target };
+    }
+    return emit('create', {
+      name, key: clientKey, steamId: app.steam?.steamId,
+      settings: {
+        listed: HOSTING_HERE,
+        startingStack: Number($('set-stack').value),
+        bigBlind: Number($('set-blinds').value),
+        actionTime: Number($('set-timer').value),
+        allowRebuy: $('set-rebuy').value === '1',
+        fillBots: 6,
+        botLevel: 'medium',
+        quickLobby: true,
+      },
+    });
+  });
+  if (res?.joined) { goToRemoteTable(res.joined); return; }
+  if (!res?.ok) { $('lobby-error').textContent = res?.error || 'Could not find or start a table.'; return; }
+  enterGame(res);
+  // The Quick Match lobby screen opens by itself (the table says it's in its lobby).
+}
+$('quick-btn').addEventListener('click', quickMatch);
+
+// The Quick Match lobby screen: who's here, who's ready, and when the game starts.
+function syncLobby() {
+  const room = app.room, dlg = $('qm-dialog');
+  if (!room?.lobby) { if (dlg.open) dlg.close(); return; }
+  const humans = room.members.filter((m) => !m.bot && m.connected);
+  const me = room.members.find((m) => m.pid === app.pid);
+  const ready = humans.filter((m) => m.ready).length;
+  $('qm-count').textContent = `${humans.length} / 8 players`;
+  const list = $('qm-list');
+  const key = JSON.stringify(humans.map((m) => [m.pid, m.name, m.ready]));
+  if (list.dataset.key !== key) {
+    list.dataset.key = key;
+    list.textContent = '';
+    for (const m of humans) {
+      const row = document.createElement('div'); row.className = 'table-row';
+      const name = document.createElement('div'); name.className = 'tr-main'; name.textContent = m.name + (m.pid === app.pid ? ' (you)' : '');
+      const st = document.createElement('span'); st.className = `tr-status${m.ready ? '' : ' waiting'}`; st.textContent = m.ready ? '\u2713 Ready' : 'Not ready';
+      row.append(name, st); list.append(row);
+    }
+    for (let i = humans.length; i < 8; i++) {
+      const row = document.createElement('div'); row.className = 'table-row qm-open';
+      const name = document.createElement('div'); name.className = 'tr-main'; name.textContent = 'Open seat';
+      row.append(name); list.append(row);
+    }
+  }
+  const secs = app.lobbyEnd ? Math.max(0, Math.ceil((app.lobbyEnd - performance.now()) / 1000)) : 0;
+  $('qm-status').textContent = app.lobbyEnd
+    ? `Starting in ${secs}s \u2014 ${ready} of ${humans.length} ready`
+    : humans.length < 2
+      ? 'Waiting for players to join. Press Ready to start now; bots fill the empty seats.'
+      : `${ready} of ${humans.length} ready \u00b7 starts when everyone is ready (or the table fills)`;
+  const btn = $('qm-ready');
+  btn.textContent = me?.ready ? 'Not ready' : 'Ready';
+  btn.classList.toggle('green', !me?.ready);
+  if (!dlg.open) { dlg.showModal(); if (padStyle) nav.focus(btn); }
+}
+$('qm-ready').addEventListener('click', () => {
+  const me = app.room?.members.find((m) => m.pid === app.pid);
+  emit('ready', { on: !me?.ready });
+});
+$('qm-leave').addEventListener('click', () => { $('qm-dialog').close(); $('leave-btn').click(); });
+$('qm-dialog').addEventListener('cancel', (e) => e.preventDefault()); // Esc doesn't hide it
 $('browse-refresh').addEventListener('click', refreshBrowser);
 
 // ---------------- controller (gamepad) ----------------
@@ -1254,7 +1343,7 @@ const pad = new PadInput({
       else if (name === 'a') { nav.ensure(L.root); nav.activate(openKeyboard); }
       else if (name === 'b' && nav.cancelEdit()) { /* stopped changing a dropdown */ }
       else if (name === 'b' || (name === 'menu' && L.type === 'menu')) {
-        if (L.type === 'dialog') L.root.close();
+        if (L.type === 'dialog' && L.root.id !== 'qm-dialog') L.root.close(); // the Quick Match lobby only closes by Leave
         else if (L.type === 'menu') $('menu').classList.add('hidden');
         nav.clear();
       } else if (name === 'menu' && L.type === 'lobby') { nav.focus($('solo-btn')); }
@@ -1362,6 +1451,7 @@ if (desktop) {
     if (!$('name-input').value.trim()) $('name-input').value = String(info.name || '').slice(0, 16);
     $('steam-invite').classList.remove('hidden');
     $('browse-btn').classList.remove('hidden');
+    if (info.quickMatch) $('quick-btn').classList.remove('hidden');
     $('list-row').classList.remove('hidden');
     for (const id of achUnlocked) desktop.unlockAchievement?.(id); // carry over progress made before Steam
     if (info.deck) {

@@ -10,6 +10,8 @@ const SEAT_ORDER = [3, 4, 2, 5, 1, 6, 0, 7]; // best views (facing the dealer) f
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 const CODE_LEN = 5;
 const DISCONNECT_REMOVE_MS = 3 * 60 * 1000;
+// Quick Match lobby: once most players are ready, the rest get this long before the game starts.
+export const LOBBY_LAST_CALL_MS = 20_000;
 const EMPTY_ROOM_TTL_MS = 10 * 60 * 1000;
 
 export const rooms = new Map();
@@ -46,6 +48,8 @@ export function normalizeSettings(s = {}) {
     botLevel: BOT_LEVELS.includes(s.botLevel) ? s.botLevel : 'medium',
     // Shown in the Steam table browser (the desktop app lists it; the server just remembers it).
     listed: !!s.listed,
+    // Quick Match: players gather in a ready-check lobby before anyone is dealt in.
+    quickLobby: !!s.quickLobby,
   };
 }
 
@@ -58,12 +62,66 @@ export class Room {
     this.members = new Map(); // key -> member
     this.hostKey = null;
     this.running = false;
-    this.timers = { turn: null, advance: null, next: null, bot: null };
+    this.timers = { turn: null, advance: null, next: null, bot: null, wait: null };
     this.deadline = 0;
     this.chat = [];
     this.banned = new Set(); // client keys and Steam IDs the host kicked
     this.emptySince = Date.now();
+    // Quick Match lobby: nobody is dealt in (and no bots sit down) until the players are ready.
+    this.inLobby = false;
+    this.lobbyUntil = 0;
+    if (this.settings.quickLobby) {
+      this.inLobby = true;
+      this.waitFill = this.settings.fillBots;
+      this.settings = { ...this.settings, fillBots: 0 };
+    }
     rooms.set(this.code, this);
+  }
+
+  // ---------- Quick Match lobby ----------
+  lobbyHumans() { return [...this.members.values()].filter((m) => !m.bot && m.connected); }
+
+  setReady(m, on) {
+    if (!this.inLobby) return null;
+    m.ready = !!on;
+    this.checkLobby();
+    this.broadcastRoom();
+    return null;
+  }
+
+  // Start when everyone is ready or the table is full. Once most players are ready, the rest
+  // get LOBBY_LAST_CALL_MS, so one player who walked away can't hold the table up.
+  checkLobby() {
+    if (!this.inLobby) return;
+    const humans = this.lobbyHumans();
+    const ready = humans.filter((m) => m.ready).length;
+    if (humans.length && (ready === humans.length || humans.length >= MAX_SEATS)) { this.endLobby(); return; }
+    const most = humans.length >= 2 && ready * 2 >= humans.length;
+    if (most && !this.lobbyUntil) {
+      this.lobbyUntil = Date.now() + LOBBY_LAST_CALL_MS;
+      this.timers.wait = setTimeout(() => this.endLobby(), LOBBY_LAST_CALL_MS);
+    } else if (!most && this.lobbyUntil) {
+      clearTimeout(this.timers.wait);
+      this.timers.wait = null;
+      this.lobbyUntil = 0;
+    }
+  }
+
+  // Lobby over: bots fill the empty seats and the game starts.
+  endLobby() {
+    if (!this.inLobby) return;
+    this.inLobby = false;
+    this.lobbyUntil = 0;
+    clearTimeout(this.timers.wait);
+    this.timers.wait = null;
+    this.settings = { ...this.settings, fillBots: this.waitFill || 0 };
+    this.rebalanceBots();
+    if (this.table.canStart()) {
+      this.running = true;
+      this.systemChat('Shuffle up and deal! Bots fill any empty seats and step aside when more players join.');
+    }
+    this.broadcastRoom();
+    this.maybeStartHand();
   }
 
   // ---------- membership ----------
@@ -109,6 +167,7 @@ export class Room {
       if (free >= 0) this.sit(m, free, true);
       else m.wantsSeat = true; // seated as soon as a bot's seat frees up (end of hand)
       this.systemChat(`${m.name} joined the table.`);
+      if (this.inLobby) { m.ready = false; this.checkLobby(); }
     }
     if (this.pausedEmpty) { this.pausedEmpty = false; this.running = true; this.systemChat('Welcome back — resuming.'); }
     socket.join(this.code);
@@ -163,6 +222,7 @@ export class Room {
       if (next) this.systemChat(`${next.name} is now the host.`);
     }
     if (!m.bot) this.rebalanceBots();
+    if (this.inLobby) this.checkLobby();
     this.broadcastRoom();
     this.checkEmpty();
   }
@@ -180,6 +240,7 @@ export class Room {
     if (m.seat >= 0 && this.table.toAct === m.seat) this.startTurnTimer();
     // Nobody left but bots: stop dealing until someone comes back.
     if (!this.humansConnected() && this.running) { this.running = false; this.pausedEmpty = true; }
+    if (this.inLobby) { this.checkLobby(); this.broadcastRoom(); }
     this.checkEmpty();
   }
 
@@ -375,6 +436,7 @@ export class Room {
   // ---------- game flow ----------
   start(m) {
     if (!this.isHost(m)) return 'Only the host can start the game';
+    if (this.inLobby) { this.endLobby(); return null; }
     if (!this.table.canStart()) return 'Need at least 2 seated players with chips';
     this.running = true;
     this.systemChat('The host started the game. Good luck!');
@@ -579,11 +641,14 @@ export class Room {
       code: this.code,
       hostPid: host ? host.pid : null,
       running: this.running,
+      lobby: this.inLobby,
+      lobbyLeft: this.lobbyUntil ? Math.max(0, this.lobbyUntil - Date.now()) : 0,
       settings: this.settings,
       members: [...this.members.values()].map((m) => ({
         pid: m.pid, name: m.name, seat: m.seat, connected: m.connected, media: m.media, color: m.color,
         bot: m.bot ? m.bot.level : null,
         botAuto: m.bot ? !!m.bot.auto : false,
+        ready: !!m.ready,
       })),
     };
   }
