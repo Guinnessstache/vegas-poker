@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('hrDesktop', {
   inviteFriend: (id) => ipcRenderer.invoke('hr:invite-friend', id),
   leaveTable: () => ipcRenderer.invoke('hr:leave-table'),
   unlockAchievement: (name) => ipcRenderer.invoke('hr:achievement', name),
+  unlockedAchievements: (names) => ipcRenderer.invoke('hr:achievements', names),
   openOverlay: (dialog) => ipcRenderer.invoke('hr:overlay', dialog),
   toggleFullscreen: (on) => ipcRenderer.invoke('hr:fullscreen', on),
   quit: () => ipcRenderer.invoke('hr:quit'),

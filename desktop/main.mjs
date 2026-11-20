@@ -91,8 +91,15 @@ async function joinSteamLobby(lobbyId) {
 async function createWindow() {
   const { startServer } = await import('../server/index.js');
   try { relay = await startTurnServer({ log: (...a) => console.log(...a) }); } catch (e) { console.warn('[turn] relay failed to start', e); }
-  localServer = await startServer({ port: 0, host: '127.0.0.1', quiet: true,
-    relay: relay && { port: relay.port, username: relay.username, credential: relay.credential } });
+  // A fixed port, not a random one: the page's saved data (achievement progress, name, settings)
+  // belongs to its address, so a new port on every launch would start the player from scratch.
+  const relayInfo = relay && { port: relay.port, username: relay.username, credential: relay.credential };
+  for (const port of [47615, 47616, 47617, 47618, 47619, 0]) {
+    try { localServer = await startServer({ port, host: '127.0.0.1', quiet: true, relay: relayInfo }); break; } catch (e) {
+      if (e?.code !== 'EADDRINUSE' || port === 0) throw e;
+      console.warn(`[server] port ${port} is in use, trying the next one`);
+    }
+  }
   const localUrl = `http://127.0.0.1:${localServer.port}`;
 
   // Carries friends' game traffic to our server (when hosting) or ours to theirs (when joining).
@@ -221,6 +228,7 @@ ipcMain.handle('hr:invite-friend', (_e, id) => {
 });
 ipcMain.handle('hr:leave-table', () => { tunnel?.closeClient(); steam?.leave(); return true; });
 ipcMain.handle('hr:achievement', (_e, name) => steam?.unlock(String(name)) ?? false);
+ipcMain.handle('hr:achievements', (_e, names) => steam?.unlockedAchievements?.((names || []).map(String)) ?? []);
 ipcMain.handle('hr:overlay', (_e, dialog) => { steam?.openOverlay(dialog); return true; });
 ipcMain.handle('hr:fullscreen', (_e, on) => { win?.setFullScreen(on == null ? !win.isFullScreen() : !!on); return win?.isFullScreen(); });
 ipcMain.handle('hr:quit', () => app.quit());

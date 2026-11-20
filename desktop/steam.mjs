@@ -408,6 +408,12 @@ export class Steam {
     } catch { return false; }
   }
 
+  // Which of these achievements this player already has on Steam.
+  unlockedAchievements(names) {
+    if (!this.client) return [];
+    return names.filter((n) => { try { return this.client.achievement.isActivated(n); } catch { return false; } });
+  }
+
   openOverlay(dialog) {
     if (!this.client) return;
     const map = { friends: 0, achievements: 6, settings: 3 };

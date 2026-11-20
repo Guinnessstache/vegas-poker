@@ -1454,6 +1454,12 @@ if (desktop) {
     if (info.quickMatch) $('quick-btn').classList.remove('hidden');
     $('list-row').classList.remove('hidden');
     for (const id of achUnlocked) desktop.unlockAchievement?.(id); // carry over progress made before Steam
+    // ...and the other way: anything Steam says this player has shows as unlocked here too.
+    desktop.unlockedAchievements?.(ACHIEVEMENTS.map((a) => a.id)).then((ids) => {
+      let added = 0;
+      for (const id of ids || []) if (ACHIEVEMENT_BY_ID[id] && !achUnlocked.has(id)) { achUnlocked.add(id); added++; }
+      if (added) { local.set('hr_ach', JSON.stringify([...achUnlocked])); if ($('ach-dialog').open) renderAchievements(); }
+    }).catch(() => {});
     if (info.deck) {
       // Steam Deck: full screen and a slightly larger interface by default.
       desktop.toggleFullscreen(true);
